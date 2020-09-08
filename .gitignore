@@ -1,0 +1,7 @@
+node_modules
+example
+build
+coverage
+coverage.json
+.coverage_artifacts
+.coverage_contracts
