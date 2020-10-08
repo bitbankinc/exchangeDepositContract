@@ -71,6 +71,21 @@ contract ExchangeDeposit {
     }
 
     /**
+     * @dev This internal function checks if the current context is the main
+     * ExchangeDeposit contract or one of the proxies.
+     * @return bool of whether or not this is ExchangeDeposit
+     * @return address payable of ExchangeDeposit or address(0)
+     */
+    function isExchangeDepositor()
+        internal
+        view
+        returns (bool, address payable)
+    {
+        address payable exDepositorAddr = exchangeDepositor();
+        return (exDepositorAddr == address(0), exDepositorAddr);
+    }
+
+    /**
      * @dev Internal function for getting the implementation address.
      * This is needed because we don't know whether the current context is
      * the ExchangeDeposit contract or a proxy contract. We deduce this by
@@ -78,9 +93,12 @@ contract ExchangeDeposit {
      * @return implementation address of the system
      */
     function getImplAddress() internal view returns (address payable) {
-        address payable exDepositorAddr = exchangeDepositor();
+        (
+            bool isExDepositor,
+            address payable exDepositorAddr
+        ) = isExchangeDepositor();
         return
-            exDepositorAddr == address(0)
+            isExDepositor
                 ? implementation
                 : ExchangeDeposit(exDepositorAddr).implementation();
     }
@@ -93,12 +111,17 @@ contract ExchangeDeposit {
     function getSendAddress() internal view returns (address payable) {
         // If exchangeDepositor doesn't exist we're the ExchangeDeposit contract
         // If not, we are the Proxy contract, and can use exchangeDepositor
-        address payable exDepositorAddr = exchangeDepositor();
-        ExchangeDeposit exDepositor = exDepositorAddr == address(0)
+        (
+            bool isExDepositor,
+            address payable exDepositorAddr
+        ) = isExchangeDepositor();
+        // If this context is ExchangeDeposit, use `this`, else use exDepositorAddr
+        ExchangeDeposit exDepositor = isExDepositor
             ? ExchangeDeposit(this)
             : ExchangeDeposit(exDepositorAddr);
         // Use exDepositor to perform logic for finding send address
         address payable coldAddr = exDepositor.coldAddress();
+        // If ExchangeDeposit is killed, use adminAddress, else use coldAddress
         address payable toAddr = coldAddr == address(0)
             ? exDepositor.adminAddress()
             : coldAddr;
