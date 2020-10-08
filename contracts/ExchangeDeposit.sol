@@ -43,8 +43,8 @@ contract ExchangeDeposit {
      * @param adminAddr See storage adminAddress
      */
     constructor(address payable coldAddr, address payable adminAddr) public {
-        validateAddress(coldAddr);
-        validateAddress(adminAddr);
+        require(coldAddr != address(0));
+        require(coldAddr != address(0));
         coldAddress = coldAddr;
         adminAddress = adminAddr;
     }
@@ -55,17 +55,6 @@ contract ExchangeDeposit {
      * @param amount The amount which was forwarded
      */
     event Deposit(address indexed receiver, uint256 amount);
-
-    /**
-     * @dev Internal function for validating addresses.
-     * Throws if the address is 0x0
-     * @param addr the address to validate
-     */
-    function validateAddress(address payable addr) internal pure {
-        if (addr == address(0)) {
-            revert('0x0 is an invalid address');
-        }
-    }
 
     /**
      * @dev isContract checks the extcodesize of the account to make sure
@@ -120,9 +109,7 @@ contract ExchangeDeposit {
      * @dev Modifier that will execute internal code block only if the sender is the specified account
      */
     modifier onlyWith(address payable addr) {
-        if (msg.sender != addr) {
-            revert('Unauthorized caller');
-        }
+        require(msg.sender == addr, 'Unauthorized caller');
         _;
     }
 
@@ -134,9 +121,7 @@ contract ExchangeDeposit {
         address payable coldAddr = exDepositorAddr == address(0)
             ? coldAddress
             : ExchangeDeposit(exDepositorAddr).coldAddress();
-        if (coldAddr == address(0)) {
-            revert('I am dead :-(');
-        }
+        require(coldAddr != address(0), 'I am dead :-(');
         _;
     }
 
@@ -146,9 +131,7 @@ contract ExchangeDeposit {
      */
     modifier onlyExchangeDepositor {
         /// @dev exchangeDepositor is null when we are ExchangeDeposit
-        if (exchangeDepositor() != address(0)) {
-            revert('Calling Wrong Contract');
-        }
+        require(exchangeDepositor() == address(0), 'Calling Wrong Contract');
         _;
     }
 
@@ -240,7 +223,7 @@ contract ExchangeDeposit {
         onlyAlive
         onlyWith(adminAddress)
     {
-        validateAddress(newAddress);
+        require(newAddress != address(0), '0x0 is an invalid address');
         coldAddress = newAddress;
     }
 
@@ -324,87 +307,11 @@ contract ExchangeDeposit {
      * We disable deposits when dead.
      * Security note: Check the event forward address
      */
-    receive() external payable {
-        assembly {
-            // STEP 1: Check if coldAddress is 0x0.
-            // since we know msg.data is empty, that means the proxy uses CALL
-            // which means we know the context is this contract.
-            let cold := sload(0)
-            if eq(cold, 0) {
-                // coldAddress is zero Revert with "I am dead :-("
-
-                // encodeFunctionSignature('Error(string)')
-                mstore(
-                    0x00,
-                    0x08c379a000000000000000000000000000000000000000000000000000000000
-                )
-
-                // encodeParameter('string', 'I am dead :-(')
-                // gives a 96 byte string, encoded in 3 chunks of 32 bytes below
-
-                // offset
-                mstore(0x04, 0x20)
-                // "I am dead :-(" length
-                mstore(0x24, 0x0d)
-                // "I am dead :-(" right padded ASCII bytes
-                mstore(
-                    0x44,
-                    0x4920616d2064656164203a2d2800000000000000000000000000000000000000
-                )
-                // Revert with the memory area we just loaded into.
-                revert(0, 0x64)
-            }
-
-            // STEP 2: If callvalue is less than minimumInput, Revert.
-            if lt(callvalue(), sload(1)) {
-                // The deposit amount is too small. Revert with "Amount too small"
-
-                // encodeFunctionSignature('Error(string)')
-                mstore(
-                    0x00,
-                    0x08c379a000000000000000000000000000000000000000000000000000000000
-                )
-
-                // encodeParameter('string', 'Amount too small')
-                // gives a 96 byte string, encoded in 3 chunks of 32 bytes below
-
-                // offset
-                mstore(0x04, 0x20)
-                // "Amount too small" length
-                mstore(0x24, 0x10)
-                // "Amount too small" right padded ASCII bytes
-                mstore(
-                    0x44,
-                    0x416d6f756e7420746f6f20736d616c6c00000000000000000000000000000000
-                )
-                // Revert with the memory area we just loaded into.
-                revert(0, 0x64)
-            }
-
-            // STEP 3: Send the funds to the coldAddress
-            if iszero(call(gas(), cold, callvalue(), 0, 0, 0, 0)) {
-                // call() returns 0 on failure
-                returndatacopy(0, 0, returndatasize())
-                revert(0, returndatasize())
-            }
-            // call() was a success
-            // STEP 4: Emit the event. Equivalent to:
-            // emit Deposit(msg.sender, msg.value)
-
-            // get free memory pointer
-            let ptr := mload(0x40)
-            // first non-indexed value is msg.value
-            mstore(ptr, callvalue())
-            log2(
-                ptr,
-                0x20,
-                // topic0 for
-                // event Deposit(address indexed receiver, uint256 amount);
-                0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c,
-                // topic1 is first indexed value, receiver
-                caller()
-            )
-        }
+    receive() external payable onlyAlive {
+        require(coldAddress != address(0), 'I am dead :-(');
+        require(msg.value >= minimumInput, 'Amount too small'); //This can also be > instead of >=
+        coldAddress.transfer(msg.value); //reverts on failure
+        emit Deposit(msg.sender, msg.value);
     }
 
     /**
@@ -420,7 +327,7 @@ contract ExchangeDeposit {
                 revert(0, 0)
             }
             // Load calldata into memory starting from the next free memory space
-            let ptr := mload(0x40)
+            let ptr := mload(0x40) //@audit verify this
             calldatacopy(ptr, 0, calldatasize())
             // perform DELEGATECALL
             let result := delegatecall(gas(), toAddr, ptr, calldatasize(), 0, 0)
