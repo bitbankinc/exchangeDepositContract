@@ -108,8 +108,8 @@ contract ExchangeDeposit {
     /**
      * @dev Modifier that will execute internal code block only if the sender is the specified account
      */
-    modifier onlyWith(address payable addr) {
-        require(msg.sender == addr, 'Unauthorized caller');
+    modifier onlyAdmin {
+        require(msg.sender == adminAddress, 'Unauthorized caller');
         _;
     }
 
@@ -221,7 +221,7 @@ contract ExchangeDeposit {
         external
         onlyExchangeDepositor
         onlyAlive
-        onlyWith(adminAddress)
+        onlyAdmin
     {
         require(newAddress != address(0), '0x0 is an invalid address');
         coldAddress = newAddress;
@@ -235,7 +235,7 @@ contract ExchangeDeposit {
         external
         onlyExchangeDepositor
         onlyAlive
-        onlyWith(adminAddress)
+        onlyAdmin
     {
         require(
             newAddress == address(0) || isContract(newAddress),
@@ -252,7 +252,7 @@ contract ExchangeDeposit {
         external
         onlyExchangeDepositor
         onlyAlive
-        onlyWith(adminAddress)
+        onlyAdmin
     {
         minimumInput = newMinInput;
     }
@@ -264,7 +264,7 @@ contract ExchangeDeposit {
         external
         onlyExchangeDepositor
         onlyAlive
-        onlyWith(adminAddress)
+        onlyAdmin
     {
         coldAddress = address(0);
     }
