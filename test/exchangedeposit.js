@@ -8,8 +8,10 @@ const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
 // Don't report gas if running coverage
 // solidity-coverage gas costs are irregular
+let DEPOSIT_GAS_MAX = 42000;
 if (process.env.npm_lifecycle_script === 'truffle run coverage') {
   console.log = () => {};
+  DEPOSIT_GAS_MAX = 100000;
 }
 
 const runtimeCode = (addr, prefix = '0x') =>
@@ -37,6 +39,17 @@ contract('ExchangeDeposit', async accounts => {
   describe('Deploy and Attributes', async () => {
     it('should deploy', async () => {
       assert.equal(await proxy.exchangeDepositor(), exchangeDepositor.address);
+    });
+
+    it('should fail deploy if using 0x0 address for constructor', async () => {
+      await assert.rejects(
+        ExchangeDeposit.new(exchangeDepositor.address, ZERO_ADDR, { from }),
+        /0x0 is an invalid address\.$/,
+      );
+      await assert.rejects(
+        ExchangeDeposit.new(ZERO_ADDR, exchangeDepositor.address, { from }),
+        /0x0 is an invalid address\.$/,
+      );
     });
 
     it('should set attributes properly', async () => {
@@ -91,7 +104,7 @@ contract('ExchangeDeposit', async accounts => {
       console.log(
         `************************************  Deposit gas used: ${tx.gasUsed}`,
       );
-      assert.ok(tx.gasUsed <= 42000, 'Deposit gas too expensive');
+      assert.ok(tx.gasUsed <= DEPOSIT_GAS_MAX, 'Deposit gas too expensive');
     });
   });
 
@@ -401,7 +414,7 @@ contract('ExchangeDeposit', async accounts => {
       const proxySampleLogic = await SampleLogic.at(proxy.address);
       await assert.rejects(
         proxySampleLogic.gatherHalfErc20(simpleCoin.address),
-        /revert$/,
+        /Fallback contract not set\.$/,
       );
       // change implementation to the sampleLogic instance address
       assertRes(
@@ -416,10 +429,19 @@ contract('ExchangeDeposit', async accounts => {
         (await simpleCoin.balanceOf(proxy.address)).toString(10),
         (BigInt(RAND_AMT) - BigInt(RAND_AMT) / BigInt(2)).toString(10),
       );
+
+      // gather the rest
       assertRes(await proxy.gatherErc20(simpleCoin.address));
       assert.equal(
         (await simpleCoin.balanceOf(proxy.address)).toString(10),
         '0',
+      );
+
+      // Give 84 (half is 42 which will fail due to our ERC20 contract's logic)
+      assertRes(await simpleCoin.giveBalance(proxy.address, '84'));
+      await assert.rejects(
+        proxySampleLogic.gatherHalfErc20(simpleCoin.address),
+        /Fallback contract failed\.$/,
       );
     });
   });

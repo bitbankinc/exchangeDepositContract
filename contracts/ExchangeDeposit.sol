@@ -43,8 +43,8 @@ contract ExchangeDeposit {
      * @param adminAddr See storage adminAddress
      */
     constructor(address payable coldAddr, address payable adminAddr) public {
-        require(coldAddr != address(0));
-        require(coldAddr != address(0));
+        require(coldAddr != address(0), '0x0 is an invalid address');
+        require(adminAddr != address(0), '0x0 is an invalid address');
         coldAddress = coldAddr;
         adminAddress = adminAddr;
     }
@@ -260,12 +260,7 @@ contract ExchangeDeposit {
     /**
      * @notice Sets coldAddress to 0, killing the forwarding and logging.
      */
-    function kill()
-        external
-        onlyExchangeDepositor
-        onlyAlive
-        onlyAdmin
-    {
+    function kill() external onlyExchangeDepositor onlyAlive onlyAdmin {
         coldAddress = address(0);
     }
 
@@ -307,7 +302,7 @@ contract ExchangeDeposit {
      * We disable deposits when dead.
      * Security note: Check the event forward address
      */
-    receive() external payable onlyAlive {
+    receive() external payable {
         require(coldAddress != address(0), 'I am dead :-(');
         require(msg.value >= minimumInput, 'Amount too small'); //This can also be > instead of >=
         coldAddress.transfer(msg.value); //reverts on failure
@@ -322,28 +317,9 @@ contract ExchangeDeposit {
      */
     fallback() external payable onlyAlive {
         address payable toAddr = getImplAddress();
-        assembly {
-            if eq(toAddr, 0) {
-                revert(0, 0)
-            }
-            // Load calldata into memory starting from the next free memory space
-            let ptr := mload(0x40) //@audit verify this
-            calldatacopy(ptr, 0, calldatasize())
-            // perform DELEGATECALL
-            let result := delegatecall(gas(), toAddr, ptr, calldatasize(), 0, 0)
-
-            // Copy the returned data.
-            returndatacopy(0, 0, returndatasize())
-
-            switch result
-                // callcode returns 0 on error.
-                case 0 {
-                    revert(0, returndatasize())
-                }
-                default {
-                    return(0, returndatasize())
-                }
-        }
+        require(toAddr != address(0), 'Fallback contract not set');
+        (bool success, ) = toAddr.delegatecall(msg.data);
+        require(success, 'Fallback contract failed');
     }
 }
 
