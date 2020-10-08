@@ -305,7 +305,8 @@ contract ExchangeDeposit {
     receive() external payable {
         require(coldAddress != address(0), 'I am dead :-(');
         require(msg.value >= minimumInput, 'Amount too small'); //This can also be > instead of >=
-        coldAddress.transfer(msg.value); //reverts on failure
+        (bool success, ) = coldAddress.call{ value: msg.value }('');
+        require(success, 'Forwarding funds failed');
         emit Deposit(msg.sender, msg.value);
     }
 

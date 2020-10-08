@@ -127,6 +127,20 @@ contract('ExchangeDeposit', async accounts => {
       assert.equal(fromBalance1 - fromBalance2, BigInt(RAND_AMT) + fee); // deposit amount + fee
     });
 
+    it('should fail if the cold address reverts', async () => {
+      const res = await exchangeDepositor.changeColdAddress(
+        sampleLogic.address,
+        {
+          from: ADMIN_ADDRESS,
+        },
+      );
+      assertRes(res);
+      await assert.rejects(
+        sendCoins(proxy.address, RAND_AMT, from),
+        /Forwarding funds failed$/,
+      );
+    });
+
     it('should gather ERC20 funds properly', async () => {
       const bal = await simpleCoin.balanceOf(proxy.address);
       assert.equal(bal.toString(10), RAND_AMT);
