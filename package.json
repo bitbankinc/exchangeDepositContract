@@ -22,15 +22,6 @@
   "keywords": [],
   "author": "Jonathan Underwood",
   "license": "UNLICENSED",
-  "dependencies": {
-    "@types/node": "^12.7.5",
-    "ethereumjs-tx": "^2.1.1",
-    "rlp": "^2.2.6",
-    "solc": "~0.7.0",
-    "ts-node": "^8.4.1",
-    "typescript": "^3.6.3",
-    "web3": "^1.2.1"
-  },
   "devDependencies": {
     "@truffle/hdwallet-provider": "^1.0.40",
     "chai": "^4.2.0",
@@ -39,6 +30,8 @@
     "mocha": "^8.0.1",
     "prettier": "^1.19.1",
     "prettier-plugin-solidity": "^1.0.0-alpha.56",
+    "rlp": "^2.2.6",
+    "solc": "~0.7.0",
     "solhint": "^3.2.0",
     "solidity-coverage": "^0.7.10",
     "truffle": "^5.1.36",
