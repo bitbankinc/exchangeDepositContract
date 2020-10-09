@@ -43,8 +43,8 @@ contract ExchangeDeposit {
      * @param adminAddr See storage adminAddress
      */
     constructor(address payable coldAddr, address payable adminAddr) public {
-        validateAddress(coldAddr);
-        validateAddress(adminAddr);
+        require(coldAddr != address(0), '0x0 is an invalid address');
+        require(adminAddr != address(0), '0x0 is an invalid address');
         coldAddress = coldAddr;
         adminAddress = adminAddr;
     }
@@ -55,17 +55,6 @@ contract ExchangeDeposit {
      * @param amount The amount which was forwarded
      */
     event Deposit(address indexed receiver, uint256 amount);
-
-    /**
-     * @dev Internal function for validating addresses.
-     * Throws if the address is 0x0
-     * @param addr the address to validate
-     */
-    function validateAddress(address payable addr) internal pure {
-        if (addr == address(0)) {
-            revert('0x0 is an invalid address');
-        }
-    }
 
     /**
      * @dev isContract checks the extcodesize of the account to make sure
@@ -82,16 +71,47 @@ contract ExchangeDeposit {
     }
 
     /**
+     * @dev This internal function checks if the current context is the main
+     * ExchangeDeposit contract or one of the proxies.
+     * @return bool of whether or not this is ExchangeDeposit
+     * @return address payable of ExchangeDeposit or address(0)
+     */
+    function isExchangeDepositor()
+        internal
+        view
+        returns (bool, address payable)
+    {
+        address payable exDepositorAddr = exchangeDepositorAddress();
+        return (exDepositorAddr == address(0), exDepositorAddr);
+    }
+
+    /**
+     * @dev Get an instance of ExchangeDeposit for the main contract
+     * @return ExchangeDeposit instance (main contract of the system)
+     */
+    function getExchangeDepositor() internal view returns (ExchangeDeposit) {
+        (
+            bool isExDepositor,
+            address payable exDepositorAddr
+        ) = isExchangeDepositor();
+        // If this context is ExchangeDeposit, use `this`, else use exDepositorAddr
+        return isExDepositor ? this : ExchangeDeposit(exDepositorAddr);
+    }
+
+    /**
      * @dev Internal function for getting the implementation address.
      * This is needed because we don't know whether the current context is
      * the ExchangeDeposit contract or a proxy contract. We deduce this by
-     * whether exchangeDepositor address is 0x0 or not.
+     * whether exchangeDepositorAddress address is 0x0 or not.
      * @return implementation address of the system
      */
     function getImplAddress() internal view returns (address payable) {
-        address payable exDepositorAddr = exchangeDepositor();
+        (
+            bool isExDepositor,
+            address payable exDepositorAddr
+        ) = isExchangeDepositor();
         return
-            exDepositorAddr == address(0)
+            isExDepositor
                 ? implementation
                 : ExchangeDeposit(exDepositorAddr).implementation();
     }
@@ -102,14 +122,10 @@ contract ExchangeDeposit {
      * @return The address for sending ERC20/ETH
      */
     function getSendAddress() internal view returns (address payable) {
-        // If exchangeDepositor doesn't exist we're the ExchangeDeposit contract
-        // If not, we are the Proxy contract, and can use exchangeDepositor
-        address payable exDepositorAddr = exchangeDepositor();
-        ExchangeDeposit exDepositor = exDepositorAddr == address(0)
-            ? ExchangeDeposit(this)
-            : ExchangeDeposit(exDepositorAddr);
+        ExchangeDeposit exDepositor = getExchangeDepositor();
         // Use exDepositor to perform logic for finding send address
         address payable coldAddr = exDepositor.coldAddress();
+        // If ExchangeDeposit is killed, use adminAddress, else use coldAddress
         address payable toAddr = coldAddr == address(0)
             ? exDepositor.adminAddress()
             : coldAddr;
@@ -119,10 +135,8 @@ contract ExchangeDeposit {
     /**
      * @dev Modifier that will execute internal code block only if the sender is the specified account
      */
-    modifier onlyWith(address payable addr) {
-        if (msg.sender != addr) {
-            revert('Unauthorized caller');
-        }
+    modifier onlyAdmin {
+        require(msg.sender == adminAddress, 'Unauthorized caller');
         _;
     }
 
@@ -130,13 +144,10 @@ contract ExchangeDeposit {
      * @dev Modifier that will execute internal code block only if not killed
      */
     modifier onlyAlive {
-        address payable exDepositorAddr = exchangeDepositor();
-        address payable coldAddr = exDepositorAddr == address(0)
-            ? coldAddress
-            : ExchangeDeposit(exDepositorAddr).coldAddress();
-        if (coldAddr == address(0)) {
-            revert('I am dead :-(');
-        }
+        require(
+            getExchangeDepositor().coldAddress() != address(0),
+            'I am dead :-('
+        );
         _;
     }
 
@@ -145,19 +156,20 @@ contract ExchangeDeposit {
      * (Not via proxy delegatecall)
      */
     modifier onlyExchangeDepositor {
-        /// @dev exchangeDepositor is null when we are ExchangeDeposit
-        if (exchangeDepositor() != address(0)) {
-            revert('Calling Wrong Contract');
-        }
+        /// @dev exchangeDepositorAddress is null when we are ExchangeDeposit
+        require(
+            exchangeDepositorAddress() == address(0),
+            'Calling Wrong Contract'
+        );
         _;
     }
 
     /**
-     * @notice exchangeDepositor is the address to which the proxy will forward.
+     * @notice exchangeDepositorAddress is the address to which the proxy will forward.
      * @dev Any address that is not a proxy will return 0x0 address.
      * @return returnAddr The address the proxy forwards to.
      */
-    function exchangeDepositor()
+    function exchangeDepositorAddress()
         public
         view
         returns (address payable returnAddr)
@@ -166,12 +178,12 @@ contract ExchangeDeposit {
             let me := address()
             let mysize := extcodesize(me)
             // The deployed code is 64 bytes, this check is quick.
+            // This will save gas for every call that is from the non-proxy
             if eq(mysize, 64) {
                 let ptr := mload(0x40)
                 // We want to be secure, so check if the code 100% matches our code.
                 extcodecopy(me, ptr, 0, mysize)
                 // bytes [1:21) are a dynamic address, so mask it away.
-                // bytes [64:96) are irrelevant, so mask them away just in case.
                 // Check if the contract matches what we deployed exactly.
                 if and(
                     eq(
@@ -238,9 +250,9 @@ contract ExchangeDeposit {
         external
         onlyExchangeDepositor
         onlyAlive
-        onlyWith(adminAddress)
+        onlyAdmin
     {
-        validateAddress(newAddress);
+        require(newAddress != address(0), '0x0 is an invalid address');
         coldAddress = newAddress;
     }
 
@@ -252,7 +264,7 @@ contract ExchangeDeposit {
         external
         onlyExchangeDepositor
         onlyAlive
-        onlyWith(adminAddress)
+        onlyAdmin
     {
         require(
             newAddress == address(0) || isContract(newAddress),
@@ -269,7 +281,7 @@ contract ExchangeDeposit {
         external
         onlyExchangeDepositor
         onlyAlive
-        onlyWith(adminAddress)
+        onlyAdmin
     {
         minimumInput = newMinInput;
     }
@@ -277,12 +289,7 @@ contract ExchangeDeposit {
     /**
      * @notice Sets coldAddress to 0, killing the forwarding and logging.
      */
-    function kill()
-        external
-        onlyExchangeDepositor
-        onlyAlive
-        onlyWith(adminAddress)
-    {
+    function kill() external onlyExchangeDepositor onlyAlive onlyAdmin {
         coldAddress = address(0);
     }
 
@@ -325,86 +332,11 @@ contract ExchangeDeposit {
      * Security note: Check the event forward address
      */
     receive() external payable {
-        assembly {
-            // STEP 1: Check if coldAddress is 0x0.
-            // since we know msg.data is empty, that means the proxy uses CALL
-            // which means we know the context is this contract.
-            let cold := sload(0)
-            if eq(cold, 0) {
-                // coldAddress is zero Revert with "I am dead :-("
-
-                // encodeFunctionSignature('Error(string)')
-                mstore(
-                    0x00,
-                    0x08c379a000000000000000000000000000000000000000000000000000000000
-                )
-
-                // encodeParameter('string', 'I am dead :-(')
-                // gives a 96 byte string, encoded in 3 chunks of 32 bytes below
-
-                // offset
-                mstore(0x04, 0x20)
-                // "I am dead :-(" length
-                mstore(0x24, 0x0d)
-                // "I am dead :-(" right padded ASCII bytes
-                mstore(
-                    0x44,
-                    0x4920616d2064656164203a2d2800000000000000000000000000000000000000
-                )
-                // Revert with the memory area we just loaded into.
-                revert(0, 0x64)
-            }
-
-            // STEP 2: If callvalue is less than minimumInput, Revert.
-            if lt(callvalue(), sload(1)) {
-                // The deposit amount is too small. Revert with "Amount too small"
-
-                // encodeFunctionSignature('Error(string)')
-                mstore(
-                    0x00,
-                    0x08c379a000000000000000000000000000000000000000000000000000000000
-                )
-
-                // encodeParameter('string', 'Amount too small')
-                // gives a 96 byte string, encoded in 3 chunks of 32 bytes below
-
-                // offset
-                mstore(0x04, 0x20)
-                // "Amount too small" length
-                mstore(0x24, 0x10)
-                // "Amount too small" right padded ASCII bytes
-                mstore(
-                    0x44,
-                    0x416d6f756e7420746f6f20736d616c6c00000000000000000000000000000000
-                )
-                // Revert with the memory area we just loaded into.
-                revert(0, 0x64)
-            }
-
-            // STEP 3: Send the funds to the coldAddress
-            if iszero(call(gas(), cold, callvalue(), 0, 0, 0, 0)) {
-                // call() returns 0 on failure
-                returndatacopy(0, 0, returndatasize())
-                revert(0, returndatasize())
-            }
-            // call() was a success
-            // STEP 4: Emit the event. Equivalent to:
-            // emit Deposit(msg.sender, msg.value)
-
-            // get free memory pointer
-            let ptr := mload(0x40)
-            // first non-indexed value is msg.value
-            mstore(ptr, callvalue())
-            log2(
-                ptr,
-                0x20,
-                // topic0 for
-                // event Deposit(address indexed receiver, uint256 amount);
-                0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c,
-                // topic1 is first indexed value, receiver
-                caller()
-            )
-        }
+        require(coldAddress != address(0), 'I am dead :-(');
+        require(msg.value >= minimumInput, 'Amount too small'); //This can also be > instead of >=
+        (bool success, ) = coldAddress.call{ value: msg.value }('');
+        require(success, 'Forwarding funds failed');
+        emit Deposit(msg.sender, msg.value);
     }
 
     /**
@@ -415,28 +347,9 @@ contract ExchangeDeposit {
      */
     fallback() external payable onlyAlive {
         address payable toAddr = getImplAddress();
-        assembly {
-            if eq(toAddr, 0) {
-                revert(0, 0)
-            }
-            // Load calldata into memory starting from the next free memory space
-            let ptr := mload(0x40)
-            calldatacopy(ptr, 0, calldatasize())
-            // perform DELEGATECALL
-            let result := delegatecall(gas(), toAddr, ptr, calldatasize(), 0, 0)
-
-            // Copy the returned data.
-            returndatacopy(0, 0, returndatasize())
-
-            switch result
-                // callcode returns 0 on error.
-                case 0 {
-                    revert(0, returndatasize())
-                }
-                default {
-                    return(0, returndatasize())
-                }
-        }
+        require(toAddr != address(0), 'Fallback contract not set');
+        (bool success, ) = toAddr.delegatecall(msg.data);
+        require(success, 'Fallback contract failed');
     }
 }
 
