@@ -2,8 +2,8 @@ const HDWalletProvider = require('@truffle/hdwallet-provider');
 module.exports = {
   networks: {
     development: {
-      host: process.env['NODE_ENV'] === 'ci' ? 'ganachecli' : '127.0.0.1',
-      port: process.env['NODE_ENV'] === 'ci' ? 8545 : 19382,
+      host: '127.0.0.1',
+      port: 19382,
       network_id: 47934673,
     },
     ropsten: {
