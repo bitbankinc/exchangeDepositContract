@@ -304,19 +304,34 @@ contract ExchangeDeposit {
         returns (address payable returnAddr)
     {
         assembly {
+            // Get the free available memory pointer (should be 0xc0)
             let ptr := mload(0x40)
             // so the address lines up with the beginning of add(ptr, 0x20)
-            mstore(add(ptr, 0x14), address())
-            mstore(ptr, 0x604080600a3d393df3fe73)
             mstore(
-                add(ptr, 0x34),
+                ptr,
+                // We insert the address after the deploy code + separator + PUSH20
+                // using a 256 bit bitwise OR operation
+                or(
+                    // the first byte and last 20 bytes hard coded to 0x00
+                    0x604080600a3d393df3fe730000000000000000000000000000000000000000,
+                    // first 12 bytes are always 0x00
+                    address()
+                )
+            )
+            mstore(
+                add(ptr, 0x20),
                 0x3d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d8280
             )
             mstore(
-                add(ptr, 0x54),
+                add(ptr, 0x40),
                 0x3e603c573d81fd5b3d81f3000000000000000000000000000000000000000000
             )
-            returnAddr := create2(0, add(ptr, 0x15), 74, salt)
+            returnAddr := create2(
+                0, // send no value
+                add(ptr, 0x1), // code starts 1 byte after ptr (first byte is 0x00)
+                0x4a, // code is 74 bytes long
+                salt // 256 bit salt
+            )
             // If the same salt is used twice, it will fail, and the
             // memory at returnAddr will be 0x0
             if eq(returnAddr, 0) {
