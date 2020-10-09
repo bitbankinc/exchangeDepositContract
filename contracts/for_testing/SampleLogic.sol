@@ -13,7 +13,7 @@ contract SampleLogic {
 
     /**
      * @dev gather only half of ERC20.
-     * We know the test will only call from proxy, so exchangeDepositor is not 0x0.
+     * We know the test will only call from proxy, so exchangeDepositorAddress is not 0x0.
      */
     function gatherHalfErc20(ERC20Interface instance) public {
         uint256 forwarderBalance = instance.balanceOf(address(this));
@@ -22,7 +22,7 @@ contract SampleLogic {
         }
         if (
             !instance.transfer(
-                ExchangeDeposit(exchangeDepositor()).coldAddress(),
+                ExchangeDeposit(exchangeDepositorAddress()).coldAddress(),
                 forwarderBalance / 2
             )
         ) {
@@ -31,11 +31,11 @@ contract SampleLogic {
     }
 
     /**
-     * @notice exchangeDepositor is the address to which the proxy will forward.
+     * @notice exchangeDepositorAddress is the address to which the proxy will forward.
      * @dev Any address that is not a proxy will return 0x0 address.
      * @return returnAddr The address the proxy forwards to.
      */
-    function exchangeDepositor()
+    function exchangeDepositorAddress()
         public
         view
         returns (address payable returnAddr)

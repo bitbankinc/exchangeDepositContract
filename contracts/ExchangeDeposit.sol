@@ -81,7 +81,7 @@ contract ExchangeDeposit {
         view
         returns (bool, address payable)
     {
-        address payable exDepositorAddr = exchangeDepositor();
+        address payable exDepositorAddr = exchangeDepositorAddress();
         return (exDepositorAddr == address(0), exDepositorAddr);
     }
 
@@ -102,7 +102,7 @@ contract ExchangeDeposit {
      * @dev Internal function for getting the implementation address.
      * This is needed because we don't know whether the current context is
      * the ExchangeDeposit contract or a proxy contract. We deduce this by
-     * whether exchangeDepositor address is 0x0 or not.
+     * whether exchangeDepositorAddress address is 0x0 or not.
      * @return implementation address of the system
      */
     function getImplAddress() internal view returns (address payable) {
@@ -144,11 +144,10 @@ contract ExchangeDeposit {
      * @dev Modifier that will execute internal code block only if not killed
      */
     modifier onlyAlive {
-        address payable exDepositorAddr = exchangeDepositor();
-        address payable coldAddr = exDepositorAddr == address(0)
-            ? coldAddress
-            : ExchangeDeposit(exDepositorAddr).coldAddress();
-        require(coldAddr != address(0), 'I am dead :-(');
+        require(
+            getExchangeDepositor().coldAddress() != address(0),
+            'I am dead :-('
+        );
         _;
     }
 
@@ -157,17 +156,20 @@ contract ExchangeDeposit {
      * (Not via proxy delegatecall)
      */
     modifier onlyExchangeDepositor {
-        /// @dev exchangeDepositor is null when we are ExchangeDeposit
-        require(exchangeDepositor() == address(0), 'Calling Wrong Contract');
+        /// @dev exchangeDepositorAddress is null when we are ExchangeDeposit
+        require(
+            exchangeDepositorAddress() == address(0),
+            'Calling Wrong Contract'
+        );
         _;
     }
 
     /**
-     * @notice exchangeDepositor is the address to which the proxy will forward.
+     * @notice exchangeDepositorAddress is the address to which the proxy will forward.
      * @dev Any address that is not a proxy will return 0x0 address.
      * @return returnAddr The address the proxy forwards to.
      */
-    function exchangeDepositor()
+    function exchangeDepositorAddress()
         public
         view
         returns (address payable returnAddr)
@@ -176,12 +178,12 @@ contract ExchangeDeposit {
             let me := address()
             let mysize := extcodesize(me)
             // The deployed code is 64 bytes, this check is quick.
+            // This will save gas for every call that is from the non-proxy
             if eq(mysize, 64) {
                 let ptr := mload(0x40)
                 // We want to be secure, so check if the code 100% matches our code.
                 extcodecopy(me, ptr, 0, mysize)
                 // bytes [1:21) are a dynamic address, so mask it away.
-                // bytes [64:96) are irrelevant, so mask them away just in case.
                 // Check if the contract matches what we deployed exactly.
                 if and(
                     eq(
