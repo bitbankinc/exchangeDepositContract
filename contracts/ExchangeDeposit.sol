@@ -86,6 +86,19 @@ contract ExchangeDeposit {
     }
 
     /**
+     * @dev Get an instance of ExchangeDeposit for the main contract
+     * @return ExchangeDeposit instance (main contract of the system)
+     */
+    function getExchangeDepositor() internal view returns (ExchangeDeposit) {
+        (
+            bool isExDepositor,
+            address payable exDepositorAddr
+        ) = isExchangeDepositor();
+        // If this context is ExchangeDeposit, use `this`, else use exDepositorAddr
+        return isExDepositor ? this : ExchangeDeposit(exDepositorAddr);
+    }
+
+    /**
      * @dev Internal function for getting the implementation address.
      * This is needed because we don't know whether the current context is
      * the ExchangeDeposit contract or a proxy contract. We deduce this by
@@ -109,16 +122,7 @@ contract ExchangeDeposit {
      * @return The address for sending ERC20/ETH
      */
     function getSendAddress() internal view returns (address payable) {
-        // If exchangeDepositor doesn't exist we're the ExchangeDeposit contract
-        // If not, we are the Proxy contract, and can use exchangeDepositor
-        (
-            bool isExDepositor,
-            address payable exDepositorAddr
-        ) = isExchangeDepositor();
-        // If this context is ExchangeDeposit, use `this`, else use exDepositorAddr
-        ExchangeDeposit exDepositor = isExDepositor
-            ? ExchangeDeposit(this)
-            : ExchangeDeposit(exDepositorAddr);
+        ExchangeDeposit exDepositor = getExchangeDepositor();
         // Use exDepositor to perform logic for finding send address
         address payable coldAddr = exDepositor.coldAddress();
         // If ExchangeDeposit is killed, use adminAddress, else use coldAddress
