@@ -332,8 +332,12 @@ contract ExchangeDeposit {
      * Security note: Check the event forward address
      */
     receive() external payable {
+        // Using a simplified version of onlyAlive
+        // since we know that any call here has no calldata
+        // this saves a large amount of gas due to the fact we know
+        // that this can only be called from the ExchangeDeposit context
         require(coldAddress != address(0), 'I am dead :-(');
-        require(msg.value >= minimumInput, 'Amount too small'); //This can also be > instead of >=
+        require(msg.value >= minimumInput, 'Amount too small');
         (bool success, ) = coldAddress.call{ value: msg.value }('');
         require(success, 'Forwarding funds failed');
         emit Deposit(msg.sender, msg.value);
