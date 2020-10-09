@@ -38,7 +38,10 @@ contract('ExchangeDeposit', async accounts => {
 
   describe('Deploy and Attributes', async () => {
     it('should deploy', async () => {
-      assert.equal(await proxy.exchangeDepositorAddress(), exchangeDepositor.address);
+      assert.equal(
+        await proxy.exchangeDepositorAddress(),
+        exchangeDepositor.address,
+      );
     });
 
     it('should fail deploy if using 0x0 address for constructor', async () => {
@@ -54,11 +57,17 @@ contract('ExchangeDeposit', async accounts => {
 
     it('should set attributes properly', async () => {
       assert.equal(await exchangeDepositor.coldAddress(), COLD_ADDRESS);
-      assert.equal(await exchangeDepositor.exchangeDepositorAddress(), ZERO_ADDR);
+      assert.equal(
+        await exchangeDepositor.exchangeDepositorAddress(),
+        ZERO_ADDR,
+      );
       assert.equal(await exchangeDepositor.adminAddress(), ADMIN_ADDRESS);
       assert.equal(await exchangeDepositor.implementation(), ZERO_ADDR);
       assert.equal(await proxy.coldAddress(), ZERO_ADDR);
-      assert.equal(await proxy.exchangeDepositorAddress(), exchangeDepositor.address);
+      assert.equal(
+        await proxy.exchangeDepositorAddress(),
+        exchangeDepositor.address,
+      );
       // immutable references pull directly from logic code
       // so it will always be the same
       assert.equal(await proxy.adminAddress(), ADMIN_ADDRESS);
