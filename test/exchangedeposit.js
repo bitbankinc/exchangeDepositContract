@@ -14,10 +14,14 @@ if (process.env.npm_lifecycle_script === 'truffle run coverage') {
   DEPOSIT_GAS_MAX = 100000;
 }
 
-const runtimeCode = (addr, prefix = '0x') =>
-  `${prefix}73${addr}3d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3`;
-const deployCode = (addr, prefix = '0x') =>
-  `${prefix}604080600a3d393df3fe${runtimeCode(addr, '')}`;
+// tweak is for using the code of the SampleLogic (only for testing)
+// the default tweak = false will return the bytecode for our proxy
+const runtimeCode = (addr, prefix = '0x', tweak = false) =>
+  `${prefix}73${addr}3d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d82${
+    tweak ? '83' : '80'
+  }3e603c573d81fd5b3d81f3`;
+const deployCode = (addr, prefix = '0x', tweak = false) =>
+  `${prefix}604080600a3d393df3fe${runtimeCode(addr, '', tweak)}`;
 
 contract('ExchangeDeposit', async accounts => {
   const COLD_ADDRESS = accounts[0];
@@ -466,6 +470,25 @@ contract('ExchangeDeposit', async accounts => {
         proxySampleLogic.gatherHalfErc20(simpleCoin.address),
         /Fallback contract failed\.$/,
       );
+
+      // Check if exchangeDepositorAddress is 0x0 when code is correct length
+      // but the actual code doesn't match
+      const exDepSampleLogic = await SampleLogic.at(exchangeDepositor.address);
+      const salt = randSalt();
+      const specialProxyAddress = await getContractAddr(
+        exchangeDepositor.address,
+        0,
+        salt,
+        true,
+      );
+      // ExchangeDepositor uses SampleLogic via DELEGATECALL to generate a proxy
+      // with a different byte code (but same EVM result)
+      assertRes(await exDepSampleLogic.deploySpecialInstance(salt, { from }));
+      // Usually a proxy would return the ExchangeDeposit address, but since this
+      // one doesn't match the bytecode perfectly it returns 0x0 address just like
+      // ExchangeDeposit would do.
+      const specialProxy = await ExchangeDeposit.at(specialProxyAddress);
+      assert.equal(await specialProxy.exchangeDepositorAddress(), ZERO_ADDR);
     });
   });
 
@@ -629,7 +652,12 @@ const deploy = async (arg1, arg2, presend) => {
   };
 };
 
-const getContractAddr = async (sender, offset = 0, salt = null) => {
+const getContractAddr = async (
+  sender,
+  offset = 0,
+  salt = null,
+  tweak = false,
+) => {
   if (salt === null) {
     const nonce = await web3.eth.getTransactionCount(sender);
     const data = rlp.encode([sender, nonce + offset]);
@@ -637,7 +665,7 @@ const getContractAddr = async (sender, offset = 0, salt = null) => {
   } else {
     if (!salt.match(/^0x[0-9a-fA-F]{64}$/)) throw new Error('wrong salt');
     const addr = sender.replace(/^0x/, '').toLowerCase();
-    const contractData = Buffer.from(deployCode(addr, ''), 'hex');
+    const contractData = Buffer.from(deployCode(addr, '', tweak), 'hex');
     const data = Buffer.concat([
       Buffer.from([0xff]),
       Buffer.from(addr, 'hex'),

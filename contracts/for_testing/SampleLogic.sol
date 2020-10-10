@@ -22,7 +22,7 @@ contract SampleLogic {
         }
         if (
             !instance.transfer(
-                ExchangeDeposit(exchangeDepositorAddress()).coldAddress(),
+                ExchangeDeposit(exchangeDepositorAddress2()).coldAddress(),
                 forwarderBalance / 2
             )
         ) {
@@ -35,7 +35,7 @@ contract SampleLogic {
      * @dev Any address that is not a proxy will return 0x0 address.
      * @return returnAddr The address the proxy forwards to.
      */
-    function exchangeDepositorAddress()
+    function exchangeDepositorAddress2()
         public
         view
         returns (address payable returnAddr)
@@ -74,6 +74,41 @@ contract SampleLogic {
                         0xffffffffffffffffffffffffffffffffffffffff
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * @dev This function is here to test the case in exchangeDepositorAddress
+     * where the code is 64 bytes but NOT equal to our code.
+     * The code has been changed by one byte (DUP1 to DUP4, it DUPs the same item)
+     * @return returnAddr The new contract address.
+     */
+    function deploySpecialInstance(bytes32 salt)
+        public
+        returns (address payable returnAddr)
+    {
+        assembly {
+            let ptr := mload(0x40)
+            mstore(
+                ptr,
+                or(
+                    0x604080600a3d393df3fe730000000000000000000000000000000000000000,
+                    address()
+                )
+            )
+            mstore(
+                add(ptr, 0x20),
+                // Changed the last byte from 80 to 83 (same result, DUPing 0x0)
+                0x3d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d8283
+            )
+            mstore(
+                add(ptr, 0x40),
+                0x3e603c573d81fd5b3d81f3000000000000000000000000000000000000000000
+            )
+            returnAddr := create2(0, add(ptr, 0x1), 0x4a, salt)
+            if eq(returnAddr, 0) {
+                revert(0, 0)
             }
         }
     }
