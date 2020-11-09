@@ -32,11 +32,36 @@ gatherErc20 and gatherEth will forward to the `address adminAddress`.
 (Since we can't refuse ERC20 payments, and a `selfdestruct` somewhere could give funds to 
 a deposit address, and we should be able to recover it somehow.
 
-### Run tests (requires docker-compose)
+## Migration
+
+```js
+const ExchangeDeposit = artifacts.require('exchangeDepositContract/ExchangeDeposit');
+
+module.exports = async (deployer, _, accounts) => {
+  // COLD_ACCOUNT is the account all ETH deposits and Erc20 tokens are forwarded to.
+  const COLD_ACCOUNT = accounts[0];
+  // ADMIN_ACCOUNT is the account that can modify state for the main contract.
+  const ADMIN_ACCOUNT = accounts[1];
+  await deployer.deploy(ExchangeDeposit, COLD_ACCOUNT, ADMIN_ACCOUNT);
+
+  const mainContract = await ExchangeDeposit.deployed();
+
+  // 32 byte salt is needed to deploy the proxy (deposit address)
+  // MUST BE GLOBALLY UNIQUE. USING THE SAME SALT TWICE WILL REVERT THE CALL.
+  const salt = '0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f';
+  // Get the address for the proxy before we create it.
+  const proxyAccount = await mainContract.deployNewInstance.call(salt);
+  // Deploy the proxy
+  await mainContract.deployNewInstance(salt);
+  console.log(`* Main Logic Contract at ${mainContract.address}`);
+  console.log(`****** Proxy Contract at ${proxyAccount}`);
+};
+```
+
+### Run tests
 
 ```bash
 $ npm install
-$ npm run build
 $ npm test
 ```
 
@@ -51,9 +76,10 @@ $ npm run build
 
 ### deploy
 
-`exchangeDepositor` がメインのロジックで `proxy` が顧客入金アドレス。
-数分掛かる可能性があります。
-`truffle-config.js`にて`networks.ropsten.gasPrice`を最新の状況に合わせて下さい。
+`exchangeDepositor` is the main logic contract and `proxy` is the 
+customer deposit contract. It will take a few minutes to deploy.
+Add `ROPSTEN_GASPRICE=100000000000` to the command to set the gasPrice
+to 100 gWei etc. (Default is 80 gWei)
 
 ```bash
 $ ROPSTEN_MNEMONIC="MNEMONIC HERE" ROPSTEN_PROVIDER="wss://ropsten.infura.io/ws/v3/<PROJECT_KEY>" npm run deploy:ropsten

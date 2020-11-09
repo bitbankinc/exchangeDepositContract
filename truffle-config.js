@@ -1,4 +1,9 @@
 const HDWalletProvider = require('@truffle/hdwallet-provider');
+
+const ropstenGasPrice = process.env['ROPSTEN_GASPRICE']
+  ? parseInt(process.env['ROPSTEN_GASPRICE'])
+  : 80000000000; // in wei
+
 module.exports = {
   networks: {
     development: {
@@ -17,7 +22,7 @@ module.exports = {
       confirmations: 2,
       timeoutBlocks: 50,
       skipDryRun: true,
-      gasPrice: 80000000000, // 80 gwei
+      gasPrice: ropstenGasPrice,
       websockets: true,
     },
   },
