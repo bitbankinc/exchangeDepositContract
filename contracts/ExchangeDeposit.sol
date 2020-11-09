@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.6.11;
 
 /**
@@ -30,7 +30,7 @@ contract ExchangeDeposit {
      */
     address payable public implementation;
     /**
-     * @notice The address that can kill the contract
+     * @notice The address that can manage the contract storage (and kill it).
      * @dev This is only set in ExchangeDeposit (this) contract's storage.
      * It has the ability to kill the contract and disable logic forwarding,
      * and change the coldAddress and implementation address storages.
@@ -51,6 +51,10 @@ contract ExchangeDeposit {
 
     /**
      * @notice Deposit event, used to log deposits sent from the Forwarder contract
+     * @dev We don't need to log coldAddress because the event logs and storage
+     * are always the same context, so as long as we are checking the correct
+     * account's event logs, no one should be able to set off events using
+     * DELEGATECALL trickery.
      * @param receiver The proxy address from which funds were forwarded
      * @param amount The amount which was forwarded
      */
@@ -101,8 +105,7 @@ contract ExchangeDeposit {
     /**
      * @dev Internal function for getting the implementation address.
      * This is needed because we don't know whether the current context is
-     * the ExchangeDeposit contract or a proxy contract. We deduce this by
-     * whether exchangeDepositorAddress address is 0x0 or not.
+     * the ExchangeDeposit contract or a proxy contract.
      * @return implementation address of the system
      */
     function getImplAddress() internal view returns (address payable) {
@@ -119,7 +122,7 @@ contract ExchangeDeposit {
     /**
      * @dev Internal function for getting the sendTo address for gathering ERC20/ETH.
      * If the contract is dead, they will be forwarded to the adminAddress.
-     * @return The address for sending ERC20/ETH
+     * @return address payable for sending ERC20/ETH
      */
     function getSendAddress() internal view returns (address payable) {
         ExchangeDeposit exDepositor = getExchangeDepositor();
@@ -166,7 +169,7 @@ contract ExchangeDeposit {
 
     /**
      * @notice exchangeDepositorAddress is the address to which the proxy will forward.
-     * @dev Any address that is not a proxy will return 0x0 address.
+     * @dev Any contract that is not a proxy will return 0x0 address.
      * @return returnAddr The address the proxy forwards to.
      */
     function exchangeDepositorAddress()
@@ -258,6 +261,7 @@ contract ExchangeDeposit {
 
     /**
      * @notice Change implementation to newAddress.
+     * @dev newAddress can be address(0) (to disable extra implementations)
      * @param newAddress the new address for implementation
      */
     function changeImplAddress(address payable newAddress)
@@ -294,9 +298,9 @@ contract ExchangeDeposit {
     }
 
     /**
-     * @dev This deploys an extremely minimalist proxy contract that
-     * deploys the contract with the current context address embedded within.
-     * Note: I will explain the bytecode in comments below this contract.
+     * @dev This deploys an extremely minimalist proxy contract with the
+     * current context address embedded within.
+     * Note: The bytecode is explained in comments below this contract.
      * @return returnAddr The new contract address.
      */
     function deployNewInstance(bytes32 salt)
@@ -344,7 +348,9 @@ contract ExchangeDeposit {
      * @notice Forward any ETH value to the coldAddress
      * @dev This receive() type fallback means msg.data will be empty.
      * We disable deposits when dead.
-     * Security note: Check the event forward address
+     * Security note: Every time you check the event log for deposits,
+     * also check the coldAddress storage to make sure it's pointing to your
+     * cold account.
      */
     receive() external payable {
         // Using a simplified version of onlyAlive
@@ -373,6 +379,9 @@ contract ExchangeDeposit {
 }
 
 /*
+    // PROXY CONTRACT EXPLANATION
+
+    // DEPLOY CODE (will not be returned by web3.eth.getCode())
     // STORE CONTRACT CODE IN MEMORY, THEN RETURN IT
     POS | OPCODE |  OPCODE TEXT      |  STACK                               |
     00  |  6040  |  PUSH1 0x40       |  0x40                                |
@@ -387,7 +396,9 @@ contract ExchangeDeposit {
 
     // START CONTRACT CODE
 
-    // If msg.data length === 0, Jump to 0x16
+    // Push the ExchangeDeposit address on the stack for DUPing later
+    // Also pushing a 0x0 for DUPing later. (saves runtime AND deploy gas)
+    // Then use the calldata size as the decider for whether to jump or not
     POS | OPCODE |  OPCODE TEXT      |  STACK                               |
     00  |  73... |  PUSH20 ...       |  {ADDR}                              |
     15  |  3d    |  RETURNDATASIZE   |  0x0 {ADDR}                          |
@@ -395,9 +406,10 @@ contract ExchangeDeposit {
     17  |  6025  |  PUSH1 0x25       |  0x25 CDS 0x0 {ADDR}                 |
     19  |  57    |  JUMPI            |  0x0 {ADDR}                          |
 
-    // If msg.data === 0, CALL into address
+    // If msg.data length === 0, CALL into address
     // This way, the proxy contract address becomes msg.sender and we can use
     // msg.sender in the Deposit Event
+    // This also gives us access to our ExchangeDeposit storage (for forwarding address)
     POS | OPCODE |  OPCODE TEXT      |  STACK                                       |
     1A  |  3d    |  RETURNDATASIZE   |  0x0 0x0 {ADDR}                              |
     1B  |  3d    |  RETURNDATASIZE   |  0x0 0x0 0x0 {ADDR}                          |
@@ -410,7 +422,9 @@ contract ExchangeDeposit {
     22  |  6031  |  PUSH1 0x31       |  0x31 {RES} 0x0 {ADDR}                       |
     24  |  56    |  JUMP             |  {RES} 0x0 {ADDR}                            |
 
-    // If msg.data > 0, DELEGATECALL into address
+    // If msg.data length > 0, DELEGATECALL into address
+    // This will allow us to call gatherErc20 using the context of the proxy
+    // address itself.
     POS | OPCODE |  OPCODE TEXT      |  STACK                                 |
     25  |  5b    |  JUMPDEST         |  0x0 {ADDR}                            |
     26  |  36    |  CALLDATASIZE     |  CDS 0x0 {ADDR}                        |
@@ -428,7 +442,6 @@ contract ExchangeDeposit {
     // We take the result of the call, load in the returndata,
     // If call result == 0, failure, revert
     // else success, return
-    // (Left the extra 0x00 on the stack so I can use DUP instead of PUSH)
     POS | OPCODE |  OPCODE TEXT      |  STACK                               |
     31  |  5b    |  JUMPDEST         |  {RES} 0x0 {ADDR}                    |
     32  |  3d    |  RETURNDATASIZE   |  RDS {RES} 0x0 {ADDR}                |

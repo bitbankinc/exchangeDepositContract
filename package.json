@@ -1,6 +1,5 @@
 {
   "name": "exchangeDepositContract",
-  "private": true,
   "version": "0.0.1",
   "description": "A deposit contract for exchanges",
   "scripts": {
@@ -15,13 +14,23 @@
     "ganache:run": "(ganache-cli -k istanbul -i 47934673 -m \"absorb surface step floor dance acid run math mean word taxi bottom\" -p 19382 >/dev/null 2>&1 &)",
     "ganache:stop": "PID=$(ps aux | grep 'node_modules/.bin/ganache-cl[i]' | sed 's/\\s\\s*/ /g' | cut -d' ' -f2) && if [ ! -z $PID ]; then kill $PID; fi",
     "lint": "solhint -c ./.solhint.json './contracts/**/*.sol'",
+    "prepare": "npm run build && truffle networks --clean",
     "prettier": "prettier '{,!(coverage|example)/**/}*.{js,ts,sol}' --bracket-spacing --single-quote --trailing-comma=all",
     "test": "npm run ganache:run && npm run truffle; CODE=$?; npm run ganache:stop; exit $CODE",
     "truffle": "truffle test"
   },
-  "keywords": [],
+  "keywords": [
+    "exchange",
+    "solidity",
+    "contract",
+    "deposits"
+  ],
   "author": "Jonathan Underwood",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "files": [
+    "contracts/ExchangeDeposit.sol",
+    "build/contracts/ExchangeDeposit.json"
+  ],
   "devDependencies": {
     "@truffle/hdwallet-provider": "^1.0.40",
     "chai": "^4.2.0",
