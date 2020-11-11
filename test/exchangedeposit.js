@@ -4,6 +4,7 @@ const rlp = require('rlp');
 const SampleLogic = artifacts.require('SampleLogic');
 const ExchangeDeposit = artifacts.require('ExchangeDeposit');
 const SimpleCoin = artifacts.require('SimpleCoin');
+const ProxyFactory = artifacts.require('ProxyFactory');
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
 // Don't report gas if running coverage
@@ -30,20 +31,26 @@ contract('ExchangeDeposit', async accounts => {
   const ADMIN_ADDRESS2 = accounts[8];
   const FUNDER_ADDRESS = accounts[9];
   const from = FUNDER_ADDRESS;
-  let exchangeDepositor, proxy, sampleLogic, simpleCoin, RAND_AMT;
+  let exchangeDepositor, proxy, proxyFactory, sampleLogic, simpleCoin, RAND_AMT;
 
   // Deploy a fresh batch of contracts for each test
   beforeEach(async () => {
     // Random amount string between 0.01 ETH and 0.5 ETH (in wei)
     RAND_AMT = randNumberString('10000000000000000', '500000000000000000');
     const deployed = await deploy(COLD_ADDRESS, ADMIN_ADDRESS, RAND_AMT);
-    ({ exchangeDepositor, proxy, sampleLogic, simpleCoin } = deployed);
+    ({
+      exchangeDepositor,
+      proxy,
+      proxyFactory,
+      sampleLogic,
+      simpleCoin,
+    } = deployed);
   });
 
   describe('Deploy and Attributes', async () => {
     it('should deploy', async () => {
       assert.equal(
-        await proxy.exchangeDepositorAddress(),
+        await getEmbeddedAddress(proxy.address),
         exchangeDepositor.address,
       );
     });
@@ -62,14 +69,14 @@ contract('ExchangeDeposit', async accounts => {
     it('should set attributes properly', async () => {
       assert.equal(await exchangeDepositor.coldAddress(), COLD_ADDRESS);
       assert.equal(
-        await exchangeDepositor.exchangeDepositorAddress(),
+        await getEmbeddedAddress(exchangeDepositor.address),
         ZERO_ADDR,
       );
       assert.equal(await exchangeDepositor.adminAddress(), ADMIN_ADDRESS);
       assert.equal(await exchangeDepositor.implementation(), ZERO_ADDR);
       assert.equal(await proxy.coldAddress(), ZERO_ADDR);
       assert.equal(
-        await proxy.exchangeDepositorAddress(),
+        await getEmbeddedAddress(proxy.address),
         exchangeDepositor.address,
       );
       // immutable references pull directly from logic code
@@ -91,9 +98,9 @@ contract('ExchangeDeposit', async accounts => {
 
     it('should revert if deploy called with the same salt twice', async () => {
       const salt = randSalt();
-      assert.ok(await exchangeDepositor.deployNewInstance(salt, { from }));
+      assert.ok(await proxyFactory.deployNewInstance(salt, { from }));
       await assert.rejects(
-        exchangeDepositor.deployNewInstance(salt, { from }),
+        proxyFactory.deployNewInstance(salt, { from }),
         /revert$/,
       );
     });
@@ -101,7 +108,8 @@ contract('ExchangeDeposit', async accounts => {
 
   describe('Gas costs', async () => {
     it('should have reasonable proxy deploy gas', async () => {
-      const tx = await exchangeDepositor.deployNewInstance(randSalt(), {
+      const salt = randSalt();
+      const tx = await proxyFactory.deployNewInstance(salt, {
         from,
       });
       assertRes(tx);
@@ -109,6 +117,12 @@ contract('ExchangeDeposit', async accounts => {
         `**********************  Proxy contract deploy gas used: ${tx.receipt.gasUsed}`,
       );
       assert.ok(tx.receipt.gasUsed <= 85000, 'Deploy gas too expensive');
+
+      // Make sure it reverts when ZERO_ADDR is used to instanciate
+      await assert.rejects(
+        ProxyFactory.new(ZERO_ADDR),
+        /0x0 is an invalid address\.$/,
+      );
     });
 
     it('should have reasonable deposit gas', async () => {
@@ -488,7 +502,7 @@ contract('ExchangeDeposit', async accounts => {
       // one doesn't match the bytecode perfectly it returns 0x0 address just like
       // ExchangeDeposit would do.
       const specialProxy = await ExchangeDeposit.at(specialProxyAddress);
-      assert.equal(await specialProxy.exchangeDepositorAddress(), ZERO_ADDR);
+      assert.equal(await getEmbeddedAddress(specialProxy.address), ZERO_ADDR);
     });
   });
 
@@ -500,7 +514,7 @@ contract('ExchangeDeposit', async accounts => {
       );
       await assert.rejects(proxy.gatherEth({ value: '42' }), /revert$/);
       await assert.rejects(
-        exchangeDepositor.deployNewInstance(randSalt(), { value: '42' }),
+        proxyFactory.deployNewInstance(randSalt(), { value: '42' }),
         /revert$/,
       );
       await assert.rejects(
@@ -633,20 +647,30 @@ const deploy = async (arg1, arg2, presend) => {
     showCost = false;
   }
 
+  const proxyFactory = await ProxyFactory.new(exchangeDepositor.address, {
+    from,
+  });
   const salt = randSalt();
-  const testCalc = await getContractAddr(exchangeDepositor.address, 0, salt);
-  const proxyAddress = await exchangeDepositor.deployNewInstance.call(salt);
+  const testCalc = await getContractAddr(
+    proxyFactory.address,
+    0,
+    salt,
+    false,
+    exchangeDepositor.address,
+  );
+  const proxyAddress = await proxyFactory.deployNewInstance.call(salt);
   assert.equal(testCalc, proxyAddress);
   if (presend !== undefined) {
     await sendCoins(proxyAddress, presend, from);
     await simpleCoin.giveBalance(proxyAddress, presend, { from });
   }
-  const tx = await exchangeDepositor.deployNewInstance(salt, { from });
+  const tx = await proxyFactory.deployNewInstance(salt, { from });
   assertRes(tx);
   const proxy = await ExchangeDeposit.at(proxyAddress);
   return {
     exchangeDepositor,
     proxy,
+    proxyFactory,
     sampleLogic,
     simpleCoin,
   };
@@ -657,6 +681,7 @@ const getContractAddr = async (
   offset = 0,
   salt = null,
   tweak = false,
+  contractAddr = sender,
 ) => {
   if (salt === null) {
     const nonce = await web3.eth.getTransactionCount(sender);
@@ -665,7 +690,8 @@ const getContractAddr = async (
   } else {
     if (!salt.match(/^0x[0-9a-fA-F]{64}$/)) throw new Error('wrong salt');
     const addr = sender.replace(/^0x/, '').toLowerCase();
-    const contractData = Buffer.from(deployCode(addr, '', tweak), 'hex');
+    const addrCont = contractAddr.replace(/^0x/, '').toLowerCase();
+    const contractData = Buffer.from(deployCode(addrCont, '', tweak), 'hex');
     const data = Buffer.concat([
       Buffer.from([0xff]),
       Buffer.from(addr, 'hex'),
@@ -675,6 +701,20 @@ const getContractAddr = async (
     return web3.utils.toChecksumAddress(
       '0x' + web3.utils.keccak256(data).slice(-40),
     );
+  }
+};
+
+const getEmbeddedAddress = async proxyAddress => {
+  const code = await web3.eth.getCode(proxyAddress);
+  const expected = runtimeCode(ZERO_ADDR.replace(/^0x/, ''));
+  if (
+    // compare 1st byte and 22nd byte onward
+    code.slice(2, 4) !== expected.slice(2, 4) ||
+    code.slice(44) !== expected.slice(44)
+  ) {
+    return ZERO_ADDR;
+  } else {
+    return web3.utils.toChecksumAddress(`0x${code.slice(4, 44)}`);
   }
 };
 

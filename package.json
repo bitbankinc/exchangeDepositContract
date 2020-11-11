@@ -29,7 +29,9 @@
   "license": "MIT",
   "files": [
     "contracts/ExchangeDeposit.sol",
-    "build/contracts/ExchangeDeposit.json"
+    "build/contracts/ExchangeDeposit.json",
+    "contracts/ProxyFactory.sol",
+    "build/contracts/ProxyFactory.json"
   ],
   "devDependencies": {
     "@truffle/hdwallet-provider": "^1.0.40",

@@ -22,7 +22,7 @@ contract SampleLogic {
         }
         if (
             !instance.transfer(
-                ExchangeDeposit(exchangeDepositorAddress2()).coldAddress(),
+                ExchangeDeposit(exchangeDepositorAddress()).coldAddress(),
                 forwarderBalance / 2
             )
         ) {
@@ -35,7 +35,7 @@ contract SampleLogic {
      * @dev Any address that is not a proxy will return 0x0 address.
      * @return returnAddr The address the proxy forwards to.
      */
-    function exchangeDepositorAddress2()
+    function exchangeDepositorAddress()
         public
         view
         returns (address payable returnAddr)

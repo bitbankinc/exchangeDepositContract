@@ -95,10 +95,7 @@ contract ExchangeDeposit {
      */
     function getExchangeDepositor() internal view returns (ExchangeDeposit) {
         // If this context is ExchangeDeposit, use `this`, else use exDepositorAddr
-        return
-            isExchangeDepositor()
-                ? this
-                : ExchangeDeposit(exchangeDepositorAddress());
+        return isExchangeDepositor() ? this : ExchangeDeposit(thisAddress);
     }
 
     /**
@@ -111,7 +108,7 @@ contract ExchangeDeposit {
         return
             isExchangeDepositor()
                 ? implementation
-                : ExchangeDeposit(exchangeDepositorAddress()).implementation();
+                : ExchangeDeposit(thisAddress).implementation();
     }
 
     /**
@@ -156,54 +153,6 @@ contract ExchangeDeposit {
     modifier onlyExchangeDepositor {
         require(isExchangeDepositor(), 'Calling Wrong Contract');
         _;
-    }
-
-    /**
-     * @notice exchangeDepositorAddress is the address to which the proxy will forward.
-     * @dev Any contract that is not a proxy will return 0x0 address.
-     * @return returnAddr The address the proxy forwards to.
-     */
-    function exchangeDepositorAddress()
-        public
-        view
-        returns (address payable returnAddr)
-    {
-        assembly {
-            let me := address()
-            let mysize := extcodesize(me)
-            // The deployed code is 64 bytes, this check is quick.
-            // This will save gas for every call that is from the non-proxy
-            if eq(mysize, 64) {
-                let ptr := mload(0x40)
-                // We want to be secure, so check if the code 100% matches our code.
-                extcodecopy(me, ptr, 0, mysize)
-                // bytes [1:21) are a dynamic address, so mask it away.
-                // Check if the contract matches what we deployed exactly.
-                if and(
-                    eq(
-                        and(
-                            // first 32 bytes bitwise AND with deployed contract address gone
-                            mload(ptr),
-                            // 00 in the mask is where the dynamic address is.
-                            0xff0000000000000000000000000000000000000000ffffffffffffffffffffff
-                        ),
-                        // our contract minus address
-                        0x7300000000000000000000000000000000000000003d366025573d3d3d3d3486
-                    ),
-                    eq(
-                        mload(add(ptr, 0x20)), // second piece of the contract
-                        0x5af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3
-                    )
-                ) {
-                    // code before address is 1 byte, need 12 bytes (+20 == 32)
-                    // bitwise AND with 20 byte mask
-                    returnAddr := and(
-                        mload(sub(ptr, 11)),
-                        0xffffffffffffffffffffffffffffffffffffffff
-                    )
-                }
-            }
-        }
     }
 
     /**
@@ -289,53 +238,6 @@ contract ExchangeDeposit {
     }
 
     /**
-     * @dev This deploys an extremely minimalist proxy contract with the
-     * current context address embedded within.
-     * Note: The bytecode is explained in comments below this contract.
-     * @return returnAddr The new contract address.
-     */
-    function deployNewInstance(bytes32 salt)
-        external
-        returns (address payable returnAddr)
-    {
-        assembly {
-            // Get the free available memory pointer (should be 0xc0)
-            let ptr := mload(0x40)
-            // so the address lines up with the beginning of add(ptr, 0x20)
-            mstore(
-                ptr,
-                // We insert the address after the deploy code + separator + PUSH20
-                // using a 256 bit bitwise OR operation
-                or(
-                    // the first byte and last 20 bytes hard coded to 0x00
-                    0x604080600a3d393df3fe730000000000000000000000000000000000000000,
-                    // first 12 bytes are always 0x00
-                    address()
-                )
-            )
-            mstore(
-                add(ptr, 0x20),
-                0x3d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d8280
-            )
-            mstore(
-                add(ptr, 0x40),
-                0x3e603c573d81fd5b3d81f3000000000000000000000000000000000000000000
-            )
-            returnAddr := create2(
-                0, // send no value
-                add(ptr, 0x1), // code starts 1 byte after ptr (first byte is 0x00)
-                0x4a, // code is 74 bytes long
-                salt // 256 bit salt
-            )
-            // If the same salt is used twice, it will fail, and the
-            // memory at returnAddr will be 0x0
-            if eq(returnAddr, 0) {
-                revert(0, 0)
-            }
-        }
-    }
-
-    /**
      * @notice Forward any ETH value to the coldAddress
      * @dev This receive() type fallback means msg.data will be empty.
      * We disable deposits when dead.
@@ -368,87 +270,6 @@ contract ExchangeDeposit {
         require(success, 'Fallback contract failed');
     }
 }
-
-/*
-    // PROXY CONTRACT EXPLANATION
-
-    // DEPLOY CODE (will not be returned by web3.eth.getCode())
-    // STORE CONTRACT CODE IN MEMORY, THEN RETURN IT
-    POS | OPCODE |  OPCODE TEXT      |  STACK                               |
-    00  |  6040  |  PUSH1 0x40       |  0x40                                |
-    02  |  80    |  DUP1             |  0x40 0x40                           |
-    03  |  600a  |  PUSH1 0x0a       |  0x0a 0x40 0x40                      |
-    05  |  3d    |  RETURNDATASIZE   |  0x0 0x0a 0x40 0x40                  |
-    06  |  39    |  CODECOPY         |  0x40                                |
-    07  |  3d    |  RETURNDATASIZE   |  0x0 0x40                            |
-    08  |  f3    |  RETURN           |                                      |
-
-    09  |  fe    |  INVALID          |                                      |
-
-    // START CONTRACT CODE
-
-    // Push the ExchangeDeposit address on the stack for DUPing later
-    // Also pushing a 0x0 for DUPing later. (saves runtime AND deploy gas)
-    // Then use the calldata size as the decider for whether to jump or not
-    POS | OPCODE |  OPCODE TEXT      |  STACK                               |
-    00  |  73... |  PUSH20 ...       |  {ADDR}                              |
-    15  |  3d    |  RETURNDATASIZE   |  0x0 {ADDR}                          |
-    16  |  36    |  CALLDATASIZE     |  CDS 0x0 {ADDR}                      |
-    17  |  6025  |  PUSH1 0x25       |  0x25 CDS 0x0 {ADDR}                 |
-    19  |  57    |  JUMPI            |  0x0 {ADDR}                          |
-
-    // If msg.data length === 0, CALL into address
-    // This way, the proxy contract address becomes msg.sender and we can use
-    // msg.sender in the Deposit Event
-    // This also gives us access to our ExchangeDeposit storage (for forwarding address)
-    POS | OPCODE |  OPCODE TEXT      |  STACK                                       |
-    1A  |  3d    |  RETURNDATASIZE   |  0x0 0x0 {ADDR}                              |
-    1B  |  3d    |  RETURNDATASIZE   |  0x0 0x0 0x0 {ADDR}                          |
-    1C  |  3d    |  RETURNDATASIZE   |  0x0 0x0 0x0 0x0 {ADDR}                      |
-    1D  |  3d    |  RETURNDATASIZE   |  0x0 0x0 0x0 0x0 0x0 {ADDR}                  |
-    1E  |  34    |  CALLVALUE        |  VALUE 0x0 0x0 0x0 0x0 0x0 {ADDR}            |
-    1F  |  86    |  DUP7             |  {ADDR} VALUE 0x0 0x0 0x0 0x0 0x0 {ADDR}     |
-    20  |  5a    |  GAS              |  GAS {ADDR} VALUE 0x0 0x0 0x0 0x0 0x0 {ADDR} |
-    21  |  f1    |  CALL             |  {RES} 0x0 {ADDR}                            |
-    22  |  6031  |  PUSH1 0x31       |  0x31 {RES} 0x0 {ADDR}                       |
-    24  |  56    |  JUMP             |  {RES} 0x0 {ADDR}                            |
-
-    // If msg.data length > 0, DELEGATECALL into address
-    // This will allow us to call gatherErc20 using the context of the proxy
-    // address itself.
-    POS | OPCODE |  OPCODE TEXT      |  STACK                                 |
-    25  |  5b    |  JUMPDEST         |  0x0 {ADDR}                            |
-    26  |  36    |  CALLDATASIZE     |  CDS 0x0 {ADDR}                        |
-    27  |  3d    |  RETURNDATASIZE   |  0x0 CDS 0x0 {ADDR}                    |
-    28  |  3d    |  RETURNDATASIZE   |  0x0 0x0 CDS 0x0 {ADDR}                |
-    29  |  37    |  CALLDATACOPY     |  0x0 {ADDR}                            |
-    2A  |  3d    |  RETURNDATASIZE   |  0x0 0x0 {ADDR}                        |
-    2B  |  3d    |  RETURNDATASIZE   |  0x0 0x0 0x0 {ADDR}                    |
-    2C  |  36    |  CALLDATASIZE     |  CDS 0x0 0x0 0x0 {ADDR}                |
-    2D  |  3d    |  RETURNDATASIZE   |  0x0 CDS 0x0 0x0 0x0 {ADDR}            |
-    2E  |  85    |  DUP6             |  {ADDR} 0x0 CDS 0x0 0x0 0x0 {ADDR}     |
-    2F  |  5a    |  GAS              |  GAS {ADDR} 0x0 CDS 0x0 0x0 0x0 {ADDR} |
-    30  |  f4    |  DELEGATECALL     |  {RES} 0x0 {ADDR}                      |
-
-    // We take the result of the call, load in the returndata,
-    // If call result == 0, failure, revert
-    // else success, return
-    POS | OPCODE |  OPCODE TEXT      |  STACK                               |
-    31  |  5b    |  JUMPDEST         |  {RES} 0x0 {ADDR}                    |
-    32  |  3d    |  RETURNDATASIZE   |  RDS {RES} 0x0 {ADDR}                |
-    33  |  82    |  DUP3             |  0x0 RDS {RES} 0x0 {ADDR}            |
-    34  |  80    |  DUP1             |  0x0 0x0 RDS {RES} 0x0 {ADDR}        |
-    35  |  3e    |  RETURNDATACOPY   |  {RES} 0x0 {ADDR}                    |
-    36  |  603c  |  PUSH1 0x3c       |  0x3c {RES} 0x0 {ADDR}               |
-    38  |  57    |  JUMPI            |  0x0 {ADDR}                          |
-    39  |  3d    |  RETURNDATASIZE   |  RDS 0x0 {ADDR}                      |
-    3A  |  81    |  DUP2             |  0x0 RDS 0x0 {ADDR}                  |
-    3B  |  fd    |  REVERT           |  0x0 {ADDR}                          |
-    3C  |  5b    |  JUMPDEST         |  0x0 {ADDR}                          |
-    3D  |  3d    |  RETURNDATASIZE   |  RDS 0x0 {ADDR}                      |
-    3E  |  81    |  DUP2             |  0x0 RDS 0x0 {ADDR}                  |
-    3F  |  f3    |  RETURN           |  0x0 {ADDR}                          |
-*/
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
