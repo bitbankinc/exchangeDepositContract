@@ -41,6 +41,13 @@ contract ExchangeDeposit {
      * for discerning whether we are a Proxy or an ExchangeDepsosit.
      */
     address payable private immutable thisAddress;
+    /**
+     * @dev The bytecode for the proxy. The first 10 bytes are deploy code.
+     * The last 64 bytes are the actual contract code.
+     */
+    bytes10 public immutable immutProxyBytecode1;
+    bytes32 public immutable immutProxyBytecode2;
+    bytes32 public immutable immutProxyBytecode3;
 
     /**
      * @notice Create the contract, and sets the destination address.
@@ -53,6 +60,14 @@ contract ExchangeDeposit {
         coldAddress = coldAddr;
         adminAddress = adminAddr;
         thisAddress = address(this);
+
+        // Store proxy deploy bytecode (74 bytes)
+        immutProxyBytecode1 = 0x604080600a3d393df3fe;
+        immutProxyBytecode2 = bytes32(
+            0x7300000000000000000000000000000000000000003d366025573d3d3d3d3486 |
+                (uint256(address(this)) << 88)
+        );
+        immutProxyBytecode3 = 0x5af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3;
     }
 
     /**
@@ -168,6 +183,9 @@ contract ExchangeDeposit {
         view
         returns (address payable returnAddr)
     {
+        // Can't use immutable in assembly, so pushing to stack first
+        bytes32 proxyBytecode2 = immutProxyBytecode2;
+        bytes32 proxyBytecode3 = immutProxyBytecode3;
         assembly {
             let me := address()
             let mysize := extcodesize(me)
@@ -175,25 +193,12 @@ contract ExchangeDeposit {
             // This will save gas for every call that is from the non-proxy
             if eq(mysize, 64) {
                 let ptr := mload(0x40)
-                // We want to be secure, so check if the code 100% matches our code.
+                // Check if the code 100% matches our code.
                 extcodecopy(me, ptr, 0, mysize)
-                // bytes [1:21) are a dynamic address, so mask it away.
                 // Check if the contract matches what we deployed exactly.
                 if and(
-                    eq(
-                        and(
-                            // first 32 bytes bitwise AND with deployed contract address gone
-                            mload(ptr),
-                            // 00 in the mask is where the dynamic address is.
-                            0xff0000000000000000000000000000000000000000ffffffffffffffffffffff
-                        ),
-                        // our contract minus address
-                        0x7300000000000000000000000000000000000000003d366025573d3d3d3d3486
-                    ),
-                    eq(
-                        mload(add(ptr, 0x20)), // second piece of the contract
-                        0x5af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3
-                    )
+                    eq(mload(ptr), proxyBytecode2),
+                    eq(mload(add(ptr, 0x20)), proxyBytecode3)
                 ) {
                     // code before address is 1 byte, need 12 bytes (+20 == 32)
                     // bitwise AND with 20 byte mask
@@ -298,32 +303,17 @@ contract ExchangeDeposit {
         external
         returns (address payable returnAddr)
     {
+        bytes10 proxyBytecode1 = immutProxyBytecode1;
+        bytes32 proxyBytecode2 = immutProxyBytecode2;
+        bytes32 proxyBytecode3 = immutProxyBytecode3;
         assembly {
-            // Get the free available memory pointer (should be 0xc0)
             let ptr := mload(0x40)
-            // so the address lines up with the beginning of add(ptr, 0x20)
-            mstore(
-                ptr,
-                // We insert the address after the deploy code + separator + PUSH20
-                // using a 256 bit bitwise OR operation
-                or(
-                    // the first byte and last 20 bytes hard coded to 0x00
-                    0x604080600a3d393df3fe730000000000000000000000000000000000000000,
-                    // first 12 bytes are always 0x00
-                    address()
-                )
-            )
-            mstore(
-                add(ptr, 0x20),
-                0x3d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d8280
-            )
-            mstore(
-                add(ptr, 0x40),
-                0x3e603c573d81fd5b3d81f3000000000000000000000000000000000000000000
-            )
+            mstore(ptr, proxyBytecode1)
+            mstore(add(ptr, 0xa), proxyBytecode2)
+            mstore(add(ptr, 0x2a), proxyBytecode3)
             returnAddr := create2(
                 0, // send no value
-                add(ptr, 0x1), // code starts 1 byte after ptr (first byte is 0x00)
+                ptr, // code starts at ptr
                 0x4a, // code is 74 bytes long
                 salt // 256 bit salt
             )
