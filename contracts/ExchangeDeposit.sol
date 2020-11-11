@@ -36,6 +36,11 @@ contract ExchangeDeposit {
      * and change the coldAddress and implementation address storages.
      */
     address payable public immutable adminAddress;
+    /**
+     * @dev The address of this ExchangeDeposit instance. This is used
+     * for discerning whether we are a Proxy or an ExchangeDepsosit.
+     */
+    address payable private immutable thisAddress;
 
     /**
      * @notice Create the contract, and sets the destination address.
@@ -47,6 +52,7 @@ contract ExchangeDeposit {
         require(adminAddr != address(0), '0x0 is an invalid address');
         coldAddress = coldAddr;
         adminAddress = adminAddr;
+        thisAddress = address(this);
     }
 
     /**
@@ -78,15 +84,9 @@ contract ExchangeDeposit {
      * @dev This internal function checks if the current context is the main
      * ExchangeDeposit contract or one of the proxies.
      * @return bool of whether or not this is ExchangeDeposit
-     * @return address payable of ExchangeDeposit or address(0)
      */
-    function isExchangeDepositor()
-        internal
-        view
-        returns (bool, address payable)
-    {
-        address payable exDepositorAddr = exchangeDepositorAddress();
-        return (exDepositorAddr == address(0), exDepositorAddr);
+    function isExchangeDepositor() internal view returns (bool) {
+        return thisAddress == address(this);
     }
 
     /**
@@ -94,12 +94,11 @@ contract ExchangeDeposit {
      * @return ExchangeDeposit instance (main contract of the system)
      */
     function getExchangeDepositor() internal view returns (ExchangeDeposit) {
-        (
-            bool isExDepositor,
-            address payable exDepositorAddr
-        ) = isExchangeDepositor();
         // If this context is ExchangeDeposit, use `this`, else use exDepositorAddr
-        return isExDepositor ? this : ExchangeDeposit(exDepositorAddr);
+        return
+            isExchangeDepositor()
+                ? this
+                : ExchangeDeposit(exchangeDepositorAddress());
     }
 
     /**
@@ -109,14 +108,10 @@ contract ExchangeDeposit {
      * @return implementation address of the system
      */
     function getImplAddress() internal view returns (address payable) {
-        (
-            bool isExDepositor,
-            address payable exDepositorAddr
-        ) = isExchangeDepositor();
         return
-            isExDepositor
+            isExchangeDepositor()
                 ? implementation
-                : ExchangeDeposit(exDepositorAddr).implementation();
+                : ExchangeDeposit(exchangeDepositorAddress()).implementation();
     }
 
     /**
@@ -159,11 +154,7 @@ contract ExchangeDeposit {
      * (Not via proxy delegatecall)
      */
     modifier onlyExchangeDepositor {
-        /// @dev exchangeDepositorAddress is null when we are ExchangeDeposit
-        require(
-            exchangeDepositorAddress() == address(0),
-            'Calling Wrong Contract'
-        );
+        require(isExchangeDepositor(), 'Calling Wrong Contract');
         _;
     }
 
