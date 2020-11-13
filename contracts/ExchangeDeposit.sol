@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.11;
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 
 /**
  * @title ExchangeDeposit
@@ -9,6 +11,7 @@ pragma solidity 0.6.11;
  * all proxies will go through this. There should only be one deployed.
  */
 contract ExchangeDeposit {
+    using SafeERC20 for IERC20;
     /**
      * @notice Address to which any funds sent to this contract will be forwarded
      * @dev This is only set in ExchangeDeposit (this) contract's storage.
@@ -161,14 +164,12 @@ contract ExchangeDeposit {
      * @dev Recipient is coldAddress if not killed, else adminAddress.
      * @param instance The address of the erc20 token contract
      */
-    function gatherErc20(ERC20Interface instance) external {
+    function gatherErc20(IERC20 instance) external {
         uint256 forwarderBalance = instance.balanceOf(address(this));
         if (forwarderBalance == 0) {
             return;
         }
-        if (!instance.transfer(getSendAddress(), forwarderBalance)) {
-            revert('Could not gather ERC20');
-        }
+        instance.safeTransfer(getSendAddress(), forwarderBalance);
     }
 
     /**
@@ -269,23 +270,4 @@ contract ExchangeDeposit {
         (bool success, ) = toAddr.delegatecall(msg.data);
         require(success, 'Fallback contract failed');
     }
-}
-
-/**
- * @dev Interface of the ERC20 standard as defined in the EIP.
- */
-interface ERC20Interface {
-    /**
-     * @dev Returns the amount of tokens owned by `account`.
-     */
-    function balanceOf(address account) external view returns (uint256);
-
-    /**
-     * @dev Moves `amount` tokens from the caller's account to `recipient`.
-     * @dev Returns a boolean value indicating whether the operation succeeded.
-     * @dev Emits a {Transfer} event.
-     */
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
 }

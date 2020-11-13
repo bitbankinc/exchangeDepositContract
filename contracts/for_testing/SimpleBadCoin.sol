@@ -4,23 +4,14 @@ pragma solidity 0.6.11;
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
  */
-interface ERC20Interface {
+interface BadERC20Interface {
     /**
-     * @dev Returns the amount of tokens owned by `account`.
+     * @dev BAD INTERFACE, DOESN'T RETURN bool
      */
-    function balanceOf(address account) external view returns (uint256);
-
-    /**
-     * @dev Moves `amount` tokens from the caller's account to `recipient`.
-     * @dev Returns a boolean value indicating whether the operation succeeded.
-     * @dev Emits a {Transfer} event.
-     */
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
+    function transfer(address recipient, uint256 amount) external;
 }
 
-contract SimpleCoin is ERC20Interface {
+contract SimpleBadCoin is BadERC20Interface {
     // This is just for tests, does not fully implement ERC20, only methods we need.
     mapping(address => uint256) private balances;
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
@@ -30,20 +21,11 @@ contract SimpleCoin is ERC20Interface {
     }
 
     // Below are the two functions we need to provide for tests
-    function balanceOf(address account)
-        external
-        override
-        view
-        returns (uint256)
-    {
+    function balanceOf(address account) external view returns (uint256) {
         return balances[account];
     }
 
-    function transfer(address recipient, uint256 amount)
-        external
-        override
-        returns (bool)
-    {
+    function transfer(address recipient, uint256 amount) external override {
         if (
             balances[msg.sender] >= amount &&
             amount > 0 &&
@@ -53,9 +35,6 @@ contract SimpleCoin is ERC20Interface {
             balances[msg.sender] -= amount;
             balances[recipient] += amount;
             emit Transfer(msg.sender, recipient, amount);
-            return true;
-        } else {
-            return false;
         }
     }
 }
