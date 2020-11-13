@@ -2,6 +2,7 @@
 pragma solidity 0.6.11;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/Address.sol';
 
 /**
  * @title ExchangeDeposit
@@ -12,6 +13,7 @@ import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
  */
 contract ExchangeDeposit {
     using SafeERC20 for IERC20;
+    using Address for address payable;
     /**
      * @notice Address to which any funds sent to this contract will be forwarded
      * @dev This is only set in ExchangeDeposit (this) contract's storage.
@@ -68,20 +70,6 @@ contract ExchangeDeposit {
      * @param amount The amount which was forwarded
      */
     event Deposit(address indexed receiver, uint256 amount);
-
-    /**
-     * @dev isContract checks the extcodesize of the account to make sure
-     * it is a smart contract.
-     * @param account The address for checking if it is a contract.
-     * @return true if contract, false if not
-     */
-    function isContract(address account) internal view returns (bool) {
-        uint256 size;
-        assembly {
-            size := extcodesize(account)
-        }
-        return size > 0;
-    }
 
     /**
      * @dev This internal function checks if the current context is the main
@@ -212,7 +200,7 @@ contract ExchangeDeposit {
         onlyAdmin
     {
         require(
-            newAddress == address(0) || isContract(newAddress),
+            newAddress == address(0) || newAddress.isContract(),
             'implementation must be contract'
         );
         implementation = newAddress;
