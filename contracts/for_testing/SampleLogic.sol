@@ -1,11 +1,14 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.6.11;
 import '../ExchangeDeposit.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 
 /**
  * @dev This is a sample to show how adding new logic would work
  */
 contract SampleLogic {
+    using SafeERC20 for IERC20;
     // The logic contracts need the same storage structure
     address payable public coldAddress;
     uint256 public minimumInput;
@@ -15,19 +18,15 @@ contract SampleLogic {
      * @dev gather only half of ERC20.
      * We know the test will only call from proxy, so exchangeDepositorAddress is not 0x0.
      */
-    function gatherHalfErc20(ERC20Interface instance) public {
+    function gatherHalfErc20(IERC20 instance) public {
         uint256 forwarderBalance = instance.balanceOf(address(this));
         if (forwarderBalance == 0) {
             return;
         }
-        if (
-            !instance.transfer(
-                ExchangeDeposit(exchangeDepositorAddress()).coldAddress(),
-                forwarderBalance / 2
-            )
-        ) {
-            revert('Could not gather half of ERC20');
-        }
+        instance.safeTransfer(
+            ExchangeDeposit(exchangeDepositorAddress()).coldAddress(),
+            forwarderBalance / 2
+        );
     }
 
     /**

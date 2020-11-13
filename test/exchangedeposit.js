@@ -4,6 +4,7 @@ const rlp = require('rlp');
 const SampleLogic = artifacts.require('SampleLogic');
 const ExchangeDeposit = artifacts.require('ExchangeDeposit');
 const SimpleCoin = artifacts.require('SimpleCoin');
+const SimpleBadCoin = artifacts.require('SimpleBadCoin');
 const ProxyFactory = artifacts.require('ProxyFactory');
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
@@ -31,7 +32,13 @@ contract('ExchangeDeposit', async accounts => {
   const ADMIN_ADDRESS2 = accounts[8];
   const FUNDER_ADDRESS = accounts[9];
   const from = FUNDER_ADDRESS;
-  let exchangeDepositor, proxy, proxyFactory, sampleLogic, simpleCoin, RAND_AMT;
+  let exchangeDepositor,
+    proxy,
+    proxyFactory,
+    sampleLogic,
+    simpleCoin,
+    simpleBadCoin,
+    RAND_AMT;
 
   // Deploy a fresh batch of contracts for each test
   beforeEach(async () => {
@@ -44,6 +51,7 @@ contract('ExchangeDeposit', async accounts => {
       proxyFactory,
       sampleLogic,
       simpleCoin,
+      simpleBadCoin,
     } = deployed);
   });
 
@@ -185,6 +193,26 @@ contract('ExchangeDeposit', async accounts => {
 
       // Should not throw if balance is 0
       const res2 = await proxy.gatherErc20(simpleCoin.address);
+      assertRes(res2);
+    });
+
+    it('should gather BAD ERC20 funds properly (no return bool)', async () => {
+      const bal = await simpleBadCoin.balanceOf(proxy.address);
+      assert.equal(bal.toString(10), RAND_AMT);
+
+      const res = await proxy.gatherErc20(simpleBadCoin.address);
+      assertRes(res);
+      console.log(
+        `************************* Gas used gathering BAD ERC20: ${res.receipt.gasUsed}`,
+      );
+
+      const bal2 = await simpleBadCoin.balanceOf(COLD_ADDRESS);
+      assert.equal(bal2.toString(10), RAND_AMT);
+      const bal3 = await simpleBadCoin.balanceOf(proxy.address);
+      assert.equal(bal3.toString(10), '0');
+
+      // Should not throw if balance is 0
+      const res2 = await proxy.gatherErc20(simpleBadCoin.address);
       assertRes(res2);
     });
 
@@ -606,7 +634,7 @@ contract('ExchangeDeposit', async accounts => {
       assertRes(res);
       await assert.rejects(
         proxy.gatherErc20(simpleCoin.address),
-        /Could not gather ERC20\.$/,
+        /SafeERC20: ERC20 operation did not succeed\.$/,
       );
     });
   });
@@ -626,12 +654,14 @@ const deploy = async (arg1, arg2, presend) => {
   // Use money from the 10th account
   const from = accounts[9];
   const simpleCoin = await SimpleCoin.new({ from });
+  const simpleBadCoin = await SimpleBadCoin.new({ from });
   const sampleLogic = await SampleLogic.new({ from });
 
   if (presend !== undefined) {
-    const addr = await getContractAddr(from, 2);
+    const addr = await getContractAddr(from, 3);
     await sendCoins(addr, presend, from);
     await simpleCoin.giveBalance(addr, presend, { from });
+    await simpleBadCoin.giveBalance(addr, presend, { from });
   }
   const beforeFromBalance = BigInt(await web3.eth.getBalance(from));
   const exchangeDepositor = await ExchangeDeposit.new(arg1, arg2, { from });
@@ -663,6 +693,7 @@ const deploy = async (arg1, arg2, presend) => {
   if (presend !== undefined) {
     await sendCoins(proxyAddress, presend, from);
     await simpleCoin.giveBalance(proxyAddress, presend, { from });
+    await simpleBadCoin.giveBalance(proxyAddress, presend, { from });
   }
   const tx = await proxyFactory.deployNewInstance(salt, { from });
   assertRes(tx);
@@ -673,6 +704,7 @@ const deploy = async (arg1, arg2, presend) => {
     proxyFactory,
     sampleLogic,
     simpleCoin,
+    simpleBadCoin,
   };
 };
 
