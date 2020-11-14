@@ -33,36 +33,6 @@ gatherErc20 and gatherEth will forward to the `address adminAddress`.
 (Since we can't refuse ERC20 payments, and a `selfdestruct` somewhere could give funds to
 a deposit address, and we should be able to recover it somehow.
 
-## Migration
-
-```js
-const ExchangeDeposit = artifacts.require('exchangeDepositContract/ExchangeDeposit');
-const ProxyFactory = artifacts.require('exchangeDepositContract/ProxyFactory');
-
-module.exports = async (deployer, _, accounts) => {
-  // COLD_ACCOUNT is the account all ETH deposits and Erc20 tokens are forwarded to.
-  const COLD_ACCOUNT = accounts[0];
-  // ADMIN_ACCOUNT is the account that can modify state for the main contract.
-  const ADMIN_ACCOUNT = accounts[1];
-  // Deploy the main contract
-  await deployer.deploy(ExchangeDeposit, COLD_ACCOUNT, ADMIN_ACCOUNT);
-  const mainContract = await ExchangeDeposit.deployed();
-  // Deploy the proxy factory
-  await deployer.deploy(ProxyFactory, mainContract.address);
-  const proxyFactoryContract = await ProxyFactory.deployed();
-  // 32 byte salt is needed to deploy the proxy (deposit address)
-  // MUST BE GLOBALLY UNIQUE. USING THE SAME SALT TWICE WILL REVERT THE CALL.
-  const salt = '0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f';
-  // Get the address for the proxy before we create it.
-  const proxyAccount = await proxyFactoryContract.deployNewInstance.call(salt);
-  // Deploy the proxy
-  await proxyFactoryContract.deployNewInstance(salt);
-  console.log(`**** Main Logic Contract at ${mainContract.address}`);
-  console.log(`* Proxy Factory Contract at ${proxyFactoryContract.address}`);
-  console.log(`********* Proxy Contract at ${proxyAccount}`);
-};
-```
-
 ### Run tests
 
 ```bash
@@ -84,14 +54,36 @@ $ npm run build
 `exchangeDepositor` is the main logic contract and `proxy` is the
 customer deposit contract. It will take a few minutes to deploy.
 Add `ROPSTEN_GASPRICE=100000000000` to the command to set the gasPrice
-to 100 gWei etc. (Default is 80 gWei)
+to 100 gWei etc. (See hardhat.config.js for which ENV vars are set to which settings)
+
+For Mainnet:
+- Change all env vars from ROPSTEN_* to MAINNET_*
+- Use npm run *:mainnet instead of npm run *:ropsten
 
 ```bash
-$ ROPSTEN_MNEMONIC="MNEMONIC HERE" ROPSTEN_PROVIDER="wss://ropsten.infura.io/ws/v3/<PROJECT_KEY>" npm run deploy:ropsten
-Compiling your contracts...
-===========================
-> Everything is up to date, there is nothing to compile.
+# Use this command to get ENV vars without sending them to stdout
+$ read -s -p "ENDPOINT? " ROPSTEN_ENDPOINT && \
+  export ROPSTEN_ENDPOINT=$ROPSTEN_ENDPOINT && \
+  echo ""
+$ read -s -p "MNEMONIC? " ROPSTEN_MNEMONIC && \
+  export ROPSTEN_MNEMONIC=$ROPSTEN_MNEMONIC && \
+  echo ""
 
-exchangeDepositor: https://ropsten.etherscan.io/address/0xF22ed8067071e28B5aB0A95dFDE1bB6e5019B98a
-            proxy: https://ropsten.etherscan.io/address/0xcffe98ea12329216Ebd7f88B7099D2a4bAE51dcB
+# ROPSTEN main contract
+$ npm run deploy:ropsten -- \
+  --contract ExchangeDeposit \
+  --arguments '["COLDADDRESS","ADMINADDRESS"]'
+# ROPSTEN ProxyFactory
+$ npm run deploy:ropsten -- \
+  --contract ProxyFactory \
+  --arguments '["MAINCONTRACTADDRESS"]'
+# ROPSTEN deploy proxy
+$ npm run deploy-proxy:ropsten -- \
+  --factory "PROXYFACTORYADDRESS"
+
+# Verify on etherscan
+# Needs ETHERSCAN_APIKEY and ROPSTEN_ENDPOINT
+$ npx hardhat verify --network ropsten "CONTRACTADDRESS" "CONSTRUCTOR ARG 1" "ARG 2"
+# Please see documentation for the plugin for hardhat etherscan
+# https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html
 ```
