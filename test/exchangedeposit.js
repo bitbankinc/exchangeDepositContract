@@ -11,7 +11,7 @@ const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 // Don't report gas if running coverage
 // solidity-coverage gas costs are irregular
 let DEPOSIT_GAS_MAX = 42000;
-if (process.env.npm_lifecycle_script === 'truffle run coverage') {
+if (process.env.npm_lifecycle_script === 'hardhat coverage') {
   console.log = () => {};
   DEPOSIT_GAS_MAX = 100000;
 }
@@ -66,11 +66,11 @@ contract('ExchangeDeposit', async accounts => {
     it('should fail deploy if using 0x0 address for constructor', async () => {
       await assert.rejects(
         ExchangeDeposit.new(exchangeDepositor.address, ZERO_ADDR, { from }),
-        /0x0 is an invalid address\.$/,
+        /0x0 is an invalid address$/,
       );
       await assert.rejects(
         ExchangeDeposit.new(ZERO_ADDR, exchangeDepositor.address, { from }),
-        /0x0 is an invalid address\.$/,
+        /0x0 is an invalid address$/,
       );
     });
 
@@ -109,7 +109,7 @@ contract('ExchangeDeposit', async accounts => {
       assert.ok(await proxyFactory.deployNewInstance(salt, { from }));
       await assert.rejects(
         proxyFactory.deployNewInstance(salt, { from }),
-        /revert$/,
+        /Transaction reverted without a reason$/,
       );
     });
   });
@@ -129,7 +129,7 @@ contract('ExchangeDeposit', async accounts => {
       // Make sure it reverts when ZERO_ADDR is used to instanciate
       await assert.rejects(
         ProxyFactory.new(ZERO_ADDR),
-        /0x0 is an invalid address\.$/,
+        /0x0 is an invalid address$/,
       );
     });
 
@@ -376,13 +376,13 @@ contract('ExchangeDeposit', async accounts => {
           COLD_ADDRESS2,
           { from }, // this would succeed with exchangeDepositor.coldAddress
         ),
-        /Unauthorized caller\.$/,
+        /Unauthorized caller$/,
       );
 
       // Can not change to 0x0 address
       await assert.rejects(
         exchangeDepositor.changeColdAddress(ZERO_ADDR, { from: ADMIN_ADDRESS }),
-        /0x0 is an invalid address\.$/,
+        /0x0 is an invalid address$/,
       );
     });
 
@@ -408,7 +408,7 @@ contract('ExchangeDeposit', async accounts => {
           sampleLogic.address,
           { from: COLD_ADDRESS2 }, // this would succeed with exchangeDepositor.coldAddress
         ),
-        /Unauthorized caller\.$/,
+        /Unauthorized caller$/,
       );
 
       // Can not change to non-contract address
@@ -416,7 +416,7 @@ contract('ExchangeDeposit', async accounts => {
         exchangeDepositor.changeImplAddress(FUNDER_ADDRESS, {
           from: ADMIN_ADDRESS,
         }),
-        /implementation must be contract\.$/,
+        /implementation must be contract$/,
       );
     });
 
@@ -438,7 +438,7 @@ contract('ExchangeDeposit', async accounts => {
         exchangeDepositor.changeMinInput('1', {
           from,
         }),
-        /Unauthorized caller\.$/,
+        /Unauthorized caller$/,
       );
     });
   });
@@ -472,7 +472,7 @@ contract('ExchangeDeposit', async accounts => {
         exchangeDepositor.kill({
           from,
         }),
-        /Unauthorized caller\.$/,
+        /Unauthorized caller$/,
       );
     });
   });
@@ -483,7 +483,7 @@ contract('ExchangeDeposit', async accounts => {
       const proxySampleLogic = await SampleLogic.at(proxy.address);
       await assert.rejects(
         proxySampleLogic.gatherHalfErc20(simpleCoin.address),
-        /Fallback contract not set\.$/,
+        /Fallback contract not set$/,
       );
       // change implementation to the sampleLogic instance address
       assertRes(
@@ -510,7 +510,7 @@ contract('ExchangeDeposit', async accounts => {
       assertRes(await simpleCoin.giveBalance(proxy.address, '84'));
       await assert.rejects(
         proxySampleLogic.gatherHalfErc20(simpleCoin.address),
-        /Fallback contract failed\.$/,
+        /Fallback contract failed$/,
       );
 
       // Check if exchangeDepositorAddress is 0x0 when code is correct length
@@ -538,55 +538,58 @@ contract('ExchangeDeposit', async accounts => {
     it('should not allow value to be added to non-payable methods', async () => {
       await assert.rejects(
         proxy.gatherErc20(simpleCoin.address, { value: '42' }),
-        /revert$/,
+        /Transaction reverted: non-payable function was called with value 42$/,
       );
-      await assert.rejects(proxy.gatherEth({ value: '42' }), /revert$/);
+      await assert.rejects(
+        proxy.gatherEth({ value: '42' }),
+        /Transaction reverted: non-payable function was called with value 42$/,
+      );
       await assert.rejects(
         proxyFactory.deployNewInstance(randSalt(), { value: '42' }),
-        /revert$/,
+        /Transaction reverted: non-payable function was called with value 42$/,
       );
       await assert.rejects(
         exchangeDepositor.changeColdAddress(COLD_ADDRESS2, {
           value: '42',
           from: ADMIN_ADDRESS,
         }),
-        /revert$/,
+        /Transaction reverted: non-payable function was called with value 42$/,
       );
       await assert.rejects(
         exchangeDepositor.changeImplAddress(sampleLogic.address, {
           value: '42',
           from: ADMIN_ADDRESS,
         }),
-        /revert$/,
+        /Transaction reverted: non-payable function was called with value 42$/,
       );
       await assert.rejects(
         exchangeDepositor.changeMinInput(RAND_AMT, {
           value: '42',
           from: ADMIN_ADDRESS,
         }),
-        /revert$/,
+        /Transaction reverted: non-payable function was called with value 42$/,
       );
       await assert.rejects(
         exchangeDepositor.kill({ value: '42', from: ADMIN_ADDRESS }),
-        /revert$/,
+        /Transaction reverted: non-payable function was called with value 42$/,
       );
     });
     it('should not allow calling change attribute methods from proxy', async () => {
       await assert.rejects(
         proxy.changeColdAddress(COLD_ADDRESS2, { from: ADMIN_ADDRESS }),
-        /Calling Wrong Contract\.$/,
+        /Calling Wrong Contract$/,
       );
       await assert.rejects(
         proxy.changeImplAddress(sampleLogic.address, { from: ADMIN_ADDRESS }),
-        /Calling Wrong Contract\.$/,
+        /Calling Wrong Contract$/,
       );
       await assert.rejects(
         proxy.changeMinInput('1', { from: ADMIN_ADDRESS }),
-        /Calling Wrong Contract\.$/,
+        /Calling Wrong Contract$/,
       );
       await assert.rejects(
         proxy.kill({ from: ADMIN_ADDRESS }),
-        /Calling Wrong Contract\.$/,
+        /Calling Wrong Contract$/,
       );
     });
     it('should fail calling change attribute methods after killed', async () => {
@@ -596,21 +599,21 @@ contract('ExchangeDeposit', async accounts => {
         exchangeDepositor.changeColdAddress(COLD_ADDRESS2, {
           from: ADMIN_ADDRESS,
         }),
-        /I am dead :-\(\.$/,
+        /I am dead :-\($/,
       );
       await assert.rejects(
         exchangeDepositor.changeImplAddress(sampleLogic.address, {
           from: ADMIN_ADDRESS,
         }),
-        /I am dead :-\(\.$/,
+        /I am dead :-\($/,
       );
       await assert.rejects(
         exchangeDepositor.changeMinInput('1', { from: ADMIN_ADDRESS }),
-        /I am dead :-\(\.$/,
+        /I am dead :-\($/,
       );
       await assert.rejects(
         exchangeDepositor.kill({ from: ADMIN_ADDRESS }),
-        /I am dead :-\(\.$/,
+        /I am dead :-\($/,
       );
     });
 
@@ -622,10 +625,7 @@ contract('ExchangeDeposit', async accounts => {
         },
       );
       assertRes(res);
-      await assert.rejects(
-        proxy.gatherEth({ from }),
-        /Could not gather ETH\.$/,
-      );
+      await assert.rejects(proxy.gatherEth({ from }), /Could not gather ETH$/);
     });
 
     it('should revert ERC20 gathering if call fails', async () => {
@@ -634,7 +634,7 @@ contract('ExchangeDeposit', async accounts => {
       assertRes(res);
       await assert.rejects(
         proxy.gatherErc20(simpleCoin.address),
-        /SafeERC20: ERC20 operation did not succeed\.$/,
+        /SafeERC20: ERC20 operation did not succeed$/,
       );
     });
   });

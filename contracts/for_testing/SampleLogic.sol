@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.11;
-import '../ExchangeDeposit.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 
 /**
  * @dev This is a sample to show how adding new logic would work
@@ -24,7 +21,7 @@ contract SampleLogic {
             return;
         }
         instance.safeTransfer(
-            ExchangeDeposit(exchangeDepositorAddress()).coldAddress(),
+            ExchangeDepositDummy(exchangeDepositorAddress()).coldAddress(),
             forwarderBalance / 2
         );
     }
@@ -109,6 +106,42 @@ contract SampleLogic {
             if eq(returnAddr, 0) {
                 revert(0, 0)
             }
+        }
+    }
+}
+
+/// @dev This is so we don't have to import ExchangeDeposit.
+// etherscan verification API was including this test source file.
+contract ExchangeDepositDummy {
+    address payable public coldAddress;
+}
+
+interface IERC20 {
+    function balanceOf(address account) external view returns (uint256);
+
+    function transfer(address recipient, uint256 amount)
+        external
+        returns (bool);
+}
+
+library SafeERC20 {
+    function safeTransfer(
+        IERC20 token,
+        address recipient,
+        uint256 amount
+    ) internal {
+        bytes memory data = abi.encodeWithSelector(
+            token.transfer.selector,
+            recipient,
+            amount
+        );
+        (bool success, bytes memory returndata) = address(token).call{
+            value: msg.value
+        }(data);
+        require(success, 'SafeERC20: low-level call failed');
+        if (returndata.length > 0) {
+            // Return data is optional
+            require(abi.decode(returndata, (bool)), 'ERC20 did not succeed');
         }
     }
 }
