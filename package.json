@@ -52,7 +52,7 @@
     "rlp": "^2.2.6",
     "solc": "0.6.11",
     "solhint": "^3.2.0",
-    "solidity-coverage": "git+https://github.com/sc-forks/solidity-coverage#2cf65306124e594343afc80310398cf09e5b0c23",
+    "solidity-coverage": "^0.7.12",
     "web3": "^1.3.0"
   }
 }
