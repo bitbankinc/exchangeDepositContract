@@ -32,8 +32,8 @@ contract SimpleCoin is ERC20Interface {
     // Below are the two functions we need to provide for tests
     function balanceOf(address account)
         external
-        override
         view
+        override
         returns (uint256)
     {
         return balances[account];
