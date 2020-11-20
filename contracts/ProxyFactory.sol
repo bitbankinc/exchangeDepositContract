@@ -3,8 +3,12 @@ pragma solidity 0.6.11;
 
 contract ProxyFactory {
     /// @dev See comment below for explanation of the proxy INIT_CODE
-    bytes
-        private constant INIT_CODE = hex'604080600a3d393df3fe7300000000000000000000000000000000000000003d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3';
+    bytes private constant INIT_CODE =
+        hex'604080600a3d393df3fe'
+        hex'7300000000000000000000000000000000000000003d36602557'
+        hex'3d3d3d3d34865af1603156'
+        hex'5b363d3d373d3d363d855af4'
+        hex'5b3d82803e603c573d81fd5b3d81f3';
     /// @dev The main address that the deployed proxies will forward to.
     address payable private immutable mainAddress;
 

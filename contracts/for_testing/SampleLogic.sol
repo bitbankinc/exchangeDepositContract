@@ -130,14 +130,9 @@ library SafeERC20 {
         address recipient,
         uint256 amount
     ) internal {
-        bytes memory data = abi.encodeWithSelector(
-            token.transfer.selector,
-            recipient,
-            amount
-        );
-        (bool success, bytes memory returndata) = address(token).call{
-            value: msg.value
-        }(data);
+        bytes memory data =
+            abi.encodeWithSelector(token.transfer.selector, recipient, amount);
+        (bool success, bytes memory returndata) = address(token).call(data);
         require(success, 'SafeERC20: low-level call failed');
         if (returndata.length > 0) {
             // Return data is optional

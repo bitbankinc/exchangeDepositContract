@@ -112,9 +112,8 @@ contract ExchangeDeposit {
         // Use exDepositor to perform logic for finding send address
         address payable coldAddr = exDepositor.coldAddress();
         // If ExchangeDeposit is killed, use adminAddress, else use coldAddress
-        address payable toAddr = coldAddr == address(0)
-            ? exDepositor.adminAddress()
-            : coldAddr;
+        address payable toAddr =
+            coldAddr == address(0) ? exDepositor.adminAddress() : coldAddr;
         return toAddr;
     }
 
