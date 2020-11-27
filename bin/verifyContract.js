@@ -16,14 +16,21 @@ function verifyContract(contractName) {
       evmVersion: 'istanbul',
       outputSelection: {
         '*': {
-          '*': ['evm.bytecode.object'],
+          '*': [
+            'abi',
+            'evm.bytecode',
+            'evm.deployedBytecode',
+            'evm.methodIdentifiers',
+          ],
+          '': ['ast'],
         },
       },
     };
+    const solcFileName = path.join('contracts', `${contractName}.sol`);
     const solcInputString = JSON.stringify({
       language: 'Solidity',
       sources: {
-        [contractName]: {
+        [solcFileName]: {
           content: contractData,
         },
       },
@@ -46,7 +53,7 @@ function verifyContract(contractName) {
     const output = solc.compile(solcInputString, { import: findImportsArg });
     const outputJson = JSON.parse(output);
     const solcBytecode =
-      outputJson.contracts[contractName][contractName].evm.bytecode.object;
+      outputJson.contracts[solcFileName][contractName].evm.bytecode.object;
 
     const hardhatString = fs.readFileSync(
       path.join(
@@ -62,12 +69,7 @@ function verifyContract(contractName) {
     const hardhatData = JSON.parse(hardhatString);
     const hhBytecode = hardhatData.bytecode.replace(/^0x/, '');
 
-    // Remove everything after the swarm hash
-    const reLastSection = /a2646970667358221220.*$/;
-    if (
-      solcBytecode.replace(reLastSection, '') !==
-      hhBytecode.replace(reLastSection, '')
-    ) {
+    if (solcBytecode !== hhBytecode) {
       console.error('*******************************');
       console.error('*******************************');
       console.error('*******************************');
