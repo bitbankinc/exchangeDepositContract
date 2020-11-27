@@ -47,6 +47,17 @@ module.exports = {
         runs: 200,
       },
       evmVersion: 'istanbul',
+      outputSelection: {
+        '*': {
+          '*': [
+            'abi',
+            'evm.bytecode',
+            'evm.deployedBytecode',
+            'evm.methodIdentifiers',
+          ],
+          '': ['ast'],
+        },
+      },
     },
   },
   etherscan: {
