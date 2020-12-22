@@ -6,6 +6,14 @@ pragma solidity 0.6.11;
  */
 contract SampleLogic {
     using SafeERC20 for IERC20;
+
+    bytes private constant INIT_CODE =
+        hex'604080600a3d393df3fe'
+        hex'7300000000000000000000000000000000000000003d36602557'
+        hex'3d3d3d3d34865af1603156'
+        hex'5b363d3d373d3d363d855af4'
+        hex'5b3d82803e603c573d81fd5b3d81f3';
+
     // The logic contracts need the same storage structure
     address payable public coldAddress;
     uint256 public minimumInput;
@@ -36,6 +44,7 @@ contract SampleLogic {
         view
         returns (address payable returnAddr)
     {
+        bytes memory CODE = INIT_CODE;
         assembly {
             let me := address()
             let mysize := extcodesize(me)
@@ -56,11 +65,11 @@ contract SampleLogic {
                             0xff0000000000000000000000000000000000000000ffffffffffffffffffffff
                         ),
                         // our contract minus address
-                        0x7300000000000000000000000000000000000000003d366025573d3d3d3d3486
+                        mload(add(CODE, 0x2a))
                     ),
                     eq(
                         mload(add(ptr, 0x20)), // second piece of the contract
-                        0x5af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3
+                        mload(add(CODE, 0x4a))
                     )
                 ) {
                     // code before address is 1 byte, need 12 bytes (+20 == 32)
@@ -84,25 +93,13 @@ contract SampleLogic {
         public
         returns (address payable returnAddr)
     {
+        bytes memory CODE = INIT_CODE;
         assembly {
-            let ptr := mload(0x40)
-            mstore(
-                ptr,
-                or(
-                    0x604080600a3d393df3fe730000000000000000000000000000000000000000,
-                    address()
-                )
-            )
-            mstore(
-                add(ptr, 0x20),
-                // Changed the last byte from 80 to 83 (same result, DUPing 0x0)
-                0x3d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d8283
-            )
-            mstore(
-                add(ptr, 0x40),
-                0x3e603c573d81fd5b3d81f3000000000000000000000000000000000000000000
-            )
-            returnAddr := create2(0, add(ptr, 0x1), 0x4a, salt)
+            let pos := add(CODE, 0x20)
+            mstore(pos, or(mload(pos), shl(8, address())))
+            // change POS 0x34 to 0x83 (0x34 + 0x0a (Deploy code) = 0x3e)
+            mstore8(add(pos, 0x3e), 0x83)
+            returnAddr := create2(0, pos, 0x4a, salt)
             if eq(returnAddr, 0) {
                 revert(0, 0)
             }
