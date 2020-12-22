@@ -1,4 +1,4 @@
-# POC Ethereum Smart Contract Deposit
+# Exchange Deposit Contract
 
 ## Goals
 
@@ -36,7 +36,7 @@ a deposit address, and we should be able to recover it somehow.
 ### Run tests
 
 ```bash
-$ npm install
+$ npm ci # Install from package-lock.json using npm ci
 $ npm test
 ```
 
@@ -87,3 +87,26 @@ $ npx hardhat verify --network ropsten "CONTRACTADDRESS" "CONSTRUCTOR ARG 1" "AR
 # Please see documentation for the plugin for hardhat etherscan
 # https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html
 ```
+
+### usage
+
+- Before checking the events of your `exchangeDepositContract`, double check to make sure
+that the `coldAddress` attribute and the `implementation` attributes are what you expect them
+to be. This will help your application recognize when someone might have tampered with your
+contract's state.
+- If the state has been tampered with, consider using the admin key to kill the system.
+This will prevent users from depositing ETH. However, since ERC20 can not be prevented, the
+address to which ERC20 tokens are forwarded to becomes the admin key (used to kill the contract).
+- When calling `deployNewInstance` on `ProxyFactory` it is possible for people to front-run
+your transaction. They are essentially generating the contract for you in a separate transaction,
+causing your transaction to fail. This is not a problem, since failure costs less than success.
+After noticing your transaction failure, call `getCode` on the expected contract address and
+see if the code matches what you expect. (the 64 byte proxy bytecode with your `exchangeDepositContract`
+address in it) If the code matches, then someone paid for your contract deployment, it doesn't
+affect the security of the contract.
+- Calling gatherErc20 is similar in gas usage to calling transfer from an EOA. It is a good
+idea to call it once per proxy address when you've received tokens for them.
+- Calling gatherEth should be irregular, as the only practical way you can receive ETH without an event
+being triggered is if someone selfdestructs a contract and gives you its balance.
+- The contract at implementation should have a similar storage structure to ExchangeDeposit,
+since it will be DELEGATECALLed from the ExchangeDeposit contract.
