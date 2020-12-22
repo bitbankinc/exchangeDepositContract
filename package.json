@@ -46,7 +46,7 @@
     "ethers": "^5.0.19",
     "hardhat": "^2.0.3",
     "istanbul": "^0.4.5",
-    "mocha": "^8.0.1",
+    "mocha": "^8.2.1",
     "prettier": "^1.19.1",
     "prettier-plugin-solidity": "^1.0.0-beta.1",
     "rlp": "^2.2.6",

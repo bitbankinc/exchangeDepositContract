@@ -44,7 +44,7 @@ contract SampleLogic {
         view
         returns (address payable returnAddr)
     {
-        bytes memory CODE = INIT_CODE;
+        bytes memory code = INIT_CODE;
         assembly {
             let me := address()
             let mysize := extcodesize(me)
@@ -65,11 +65,11 @@ contract SampleLogic {
                             0xff0000000000000000000000000000000000000000ffffffffffffffffffffff
                         ),
                         // our contract minus address
-                        mload(add(CODE, 0x2a))
+                        mload(add(code, 0x2a))
                     ),
                     eq(
                         mload(add(ptr, 0x20)), // second piece of the contract
-                        mload(add(CODE, 0x4a))
+                        mload(add(code, 0x4a))
                     )
                 ) {
                     // code before address is 1 byte, need 12 bytes (+20 == 32)
@@ -93,9 +93,9 @@ contract SampleLogic {
         public
         returns (address payable returnAddr)
     {
-        bytes memory CODE = INIT_CODE;
+        bytes memory code = INIT_CODE;
         assembly {
-            let pos := add(CODE, 0x20)
+            let pos := add(code, 0x20)
             mstore(pos, or(mload(pos), shl(8, address())))
             // change POS 0x34 to 0x83 (0x34 + 0x0a (Deploy code) = 0x3e)
             mstore8(add(pos, 0x3e), 0x83)
