@@ -10,7 +10,7 @@ contract ProxyFactory {
         hex'5b363d3d373d3d363d855af4'
         hex'5b3d82803e603c573d81fd5b3d81f3';
     /// @dev The main address that the deployed proxies will forward to.
-    address payable private immutable mainAddress;
+    address payable public immutable mainAddress;
 
     constructor(address payable addr) public {
         require(addr != address(0), '0x0 is an invalid address');
