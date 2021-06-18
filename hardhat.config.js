@@ -11,6 +11,7 @@ module.exports = {
     hardhat: {
       accounts: {
         mnemonic:
+          process.env.HARDHAT_MNEMONIC ||
           'absorb surface step floor dance acid run math mean word taxi bottom',
         hardfork: 'istanbul',
         accountsBalance: '1000000000000000000000000000',
