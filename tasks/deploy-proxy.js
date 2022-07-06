@@ -32,8 +32,12 @@ task('deploy-proxy', 'Deploys a proxy from ProxyFactory')
 
     if (taskArgs.skipPrompt === 'false') {
       console.log('=======================');
-      console.log(`                Salt: ${taskArgs.salt}`);
-      console.log(`Result Proxy Address: ${proxyAddress}`);
+      console.log(
+        `Exchange Deposit Contract: ${await proxyFactory.mainAddress()}`,
+      );
+      console.log(`   Proxy Factory Contract: ${proxyFactory.address}`);
+      console.log(`                     Salt: ${taskArgs.salt}`);
+      console.log(`    Result Proxy Contract: ${proxyAddress}`);
       console.log('=======================');
       const answer = await prompt('Is this OK? (y/n) ');
       if (answer !== 'y') {
