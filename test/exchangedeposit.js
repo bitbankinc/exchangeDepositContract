@@ -40,6 +40,30 @@ contract('ExchangeDeposit', async accounts => {
     simpleBadCoin,
     RAND_AMT;
 
+  // Make sure the deployed addresses are always the same given the same nonce and account
+  // (Sanity check)
+  before(async () => {
+    assert.equal(
+      from,
+      '0x9b720Bc8A3dd670A24D8BeB0923a45A324b94abD',
+      'Mismatch of from address for tests',
+    );
+    const nonce = await web3.eth.getTransactionCount(from);
+    assert.equal(nonce, 0, 'Please run the tests on a fresh hardhat network');
+    const ex = await ExchangeDeposit.new(COLD_ADDRESS, ADMIN_ADDRESS, { from });
+    const prf = await ProxyFactory.new(ex.address, { from });
+    assert.equal(
+      ex.address,
+      '0x3F2ffaBc7bd3E4399E3d6Cf06c8eD09FED69b716',
+      'Mismatch of deployed ExchangeDeposit contract address',
+    );
+    assert.equal(
+      prf.address,
+      '0xFdfe1787577c781D4C8764Af30269508790e4267',
+      'Mismatch of deployed ProxyFactory contract address',
+    );
+  });
+
   // Deploy a fresh batch of contracts for each test
   beforeEach(async () => {
     // Random amount string between 0.01 ETH and 0.5 ETH (in wei)

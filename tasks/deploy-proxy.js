@@ -1,8 +1,14 @@
 const crypto = require('crypto');
 
+// For prompting user
+const readline = require('readline');
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
+const prompt = (query) => new Promise((resolve) => rl.question(query, resolve));
+
 task('deploy-proxy', 'Deploys a proxy from ProxyFactory')
   .addParam('factory', 'The factory address')
   .addOptionalParam('salt', 'The salt for generating the proxy', randomSalt())
+  .addOptionalParam('skipPrompt', 'Skip the contract address check prompt', 'false')
   .setAction(async (taskArgs, hre) => {
     await hre.run('compile');
     console.log('=======================');
@@ -15,6 +21,18 @@ task('deploy-proxy', 'Deploys a proxy from ProxyFactory')
     const proxyAddress = await proxyFactory.callStatic.deployNewInstance(
       taskArgs.salt,
     );
+
+    if (taskArgs.skipPrompt === 'false') {
+      console.log('=======================');
+      console.log(`                Salt: ${taskArgs.salt}`);
+      console.log(`Result Proxy Address: ${proxyAddress}`);
+      console.log('=======================');
+      const answer = await prompt('Is this OK? (y/n) ');
+      if (answer !== 'y') {
+        throw new Error('Did not answer "y" on confirmation prompt! Aborting!');
+      }
+    }
+
     // Get start time of deploy
     const startTime = Date.now();
     const tx = await proxyFactory.deployNewInstance(taskArgs.salt);
