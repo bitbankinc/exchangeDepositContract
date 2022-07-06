@@ -17,7 +17,7 @@ task('deploy', 'Deploys a contract with given arguments')
     'The constructor arguments for the contract (ie. \'["arg1","arg2"]\')',
   )
   .addOptionalParam(
-    'skipPrompt',
+    'skipprompt',
     'Skip the contract address check prompt',
     'false',
   )
@@ -34,7 +34,7 @@ task('deploy', 'Deploys a contract with given arguments')
     const accounts = await hre.web3.eth.getAccounts();
     const balance = await hre.web3.eth.getBalance(accounts[0]);
 
-    if (taskArgs.skipPrompt === 'false') {
+    if (taskArgs.skipprompt === 'false') {
       const { address, nonce } = await getContractAddress(
         accounts[0],
         hre.web3,

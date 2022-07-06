@@ -13,7 +13,7 @@ task('deploy-proxy', 'Deploys a proxy from ProxyFactory')
   .addParam('factory', 'The factory address')
   .addOptionalParam('salt', 'The salt for generating the proxy', randomSalt())
   .addOptionalParam(
-    'skipPrompt',
+    'skipprompt',
     'Skip the contract address check prompt',
     'false',
   )
@@ -30,7 +30,7 @@ task('deploy-proxy', 'Deploys a proxy from ProxyFactory')
       taskArgs.salt,
     );
 
-    if (taskArgs.skipPrompt === 'false') {
+    if (taskArgs.skipprompt === 'false') {
       console.log('=======================');
       console.log(
         `Exchange Deposit Contract: ${await proxyFactory.mainAddress()}`,
