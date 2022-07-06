@@ -28,6 +28,7 @@ task('deploy', 'Deploys a contract with given arguments')
     verifyContract(taskArgs.contract);
 
     const Contract = await hre.ethers.getContractFactory(taskArgs.contract);
+    const args = JSON.parse(taskArgs.arguments);
 
     const gasPrice = await hre.web3.eth.getGasPrice();
     const accounts = await hre.web3.eth.getAccounts();
@@ -39,9 +40,19 @@ task('deploy', 'Deploys a contract with given arguments')
         hre.web3,
       );
       console.log('=======================');
-      console.log(`         Deploy Account: ${accounts[0]}`);
-      console.log(`   Deploy Account nonce: ${nonce}`);
-      console.log(`Result Contract Address: ${address}`);
+      if (taskArgs.contract === 'ExchangeDeposit') {
+        console.log('== Contract Constructor Arguments ==');
+        console.log(`1.            Cold Address: ${args[0]}`);
+        console.log(`2.           Admin Address: ${args[1]}`);
+        console.log('=======================');
+      } else if (taskArgs.contract === 'ProxyFactory') {
+        console.log('== Contract Constructor Arguments ==');
+        console.log(`1. ExchangeDeposit Address: ${args[0]}`);
+        console.log('=======================');
+      }
+      console.log(`            Deploy Account: ${accounts[0]}`);
+      console.log(`      Deploy Account nonce: ${nonce}`);
+      console.log(`   Result Contract Address: ${address}`);
       console.log('=======================');
       const answer = await prompt('Is this OK? (y/n) ');
       if (answer !== 'y') {
@@ -59,7 +70,7 @@ task('deploy', 'Deploys a contract with given arguments')
     // Get start time of deploy
     const startTime = Date.now();
     // Deploy
-    const contract = await Contract.deploy(...JSON.parse(taskArgs.arguments));
+    const contract = await Contract.deploy(...args);
     // Show time every 5 seconds
     const cancelToken = setInterval(() => {
       const currentTime = Date.now();
