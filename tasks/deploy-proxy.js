@@ -2,13 +2,21 @@ const crypto = require('crypto');
 
 // For prompting user
 const readline = require('readline');
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
-const prompt = (query) => new Promise((resolve) => rl.question(query, resolve));
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false,
+});
+const prompt = query => new Promise(resolve => rl.question(query, resolve));
 
 task('deploy-proxy', 'Deploys a proxy from ProxyFactory')
   .addParam('factory', 'The factory address')
   .addOptionalParam('salt', 'The salt for generating the proxy', randomSalt())
-  .addOptionalParam('skipPrompt', 'Skip the contract address check prompt', 'false')
+  .addOptionalParam(
+    'skipPrompt',
+    'Skip the contract address check prompt',
+    'false',
+  )
   .setAction(async (taskArgs, hre) => {
     await hre.run('compile');
     console.log('=======================');

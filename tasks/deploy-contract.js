@@ -3,8 +3,12 @@ const verifyContract = require('../bin/verifyContract');
 
 // For prompting user
 const readline = require('readline');
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
-const prompt = (query) => new Promise((resolve) => rl.question(query, resolve));
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false,
+});
+const prompt = query => new Promise(resolve => rl.question(query, resolve));
 
 task('deploy', 'Deploys a contract with given arguments')
   .addParam('contract', 'The name of the contract')
@@ -12,7 +16,11 @@ task('deploy', 'Deploys a contract with given arguments')
     'arguments',
     'The constructor arguments for the contract (ie. \'["arg1","arg2"]\')',
   )
-  .addOptionalParam('skipPrompt', 'Skip the contract address check prompt', 'false')
+  .addOptionalParam(
+    'skipPrompt',
+    'Skip the contract address check prompt',
+    'false',
+  )
   .setAction(async (taskArgs, hre) => {
     await hre.run('compile');
 
@@ -26,7 +34,10 @@ task('deploy', 'Deploys a contract with given arguments')
     const balance = await hre.web3.eth.getBalance(accounts[0]);
 
     if (taskArgs.skipPrompt === 'false') {
-      const { address, nonce } = await getContractAddress(accounts[0], hre.web3);
+      const { address, nonce } = await getContractAddress(
+        accounts[0],
+        hre.web3,
+      );
       console.log('=======================');
       console.log(`         Deploy Account: ${accounts[0]}`);
       console.log(`   Deploy Account nonce: ${nonce}`);
@@ -74,9 +85,11 @@ task('deploy', 'Deploys a contract with given arguments')
 async function getContractAddress(sender, web3) {
   const nonce = await web3.eth.getTransactionCount(sender);
   const data = rlp.encode([sender, nonce]);
-  const address = web3.utils.toChecksumAddress(web3.utils.keccak256(data).slice(-40));
+  const address = web3.utils.toChecksumAddress(
+    web3.utils.keccak256(data).slice(-40),
+  );
   return {
     nonce,
     address,
-  }
+  };
 }
