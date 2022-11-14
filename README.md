@@ -53,37 +53,37 @@ $ npm run build
 
 `exchangeDepositor` is the main logic contract and `proxy` is the
 customer deposit contract. It will take a few minutes to deploy.
-Add `ROPSTEN_GASPRICE=100000000000` to the command to set the gasPrice
+Add `GOERLI_GASPRICE=100000000000` to the command to set the gasPrice
 to 100 gWei etc. (See hardhat.config.js for which ENV vars are set to which settings)
 
 For Mainnet:
-- Change all env vars from ROPSTEN_* to MAINNET_*
-- Use npm run *:mainnet instead of npm run *:ropsten
+- Change all env vars from GOERLI_* to MAINNET_*
+- Use npm run *:mainnet instead of npm run *:goerli
 
 ```bash
 # Use this command to get ENV vars without sending them to stdout
-$ read -s -p "ENDPOINT? " ROPSTEN_ENDPOINT && \
-  export ROPSTEN_ENDPOINT=$ROPSTEN_ENDPOINT && \
+$ read -s -p "ENDPOINT? " GOERLI_ENDPOINT && \
+  export GOERLI_ENDPOINT=$GOERLI_ENDPOINT && \
   echo ""
-$ read -s -p "MNEMONIC? " ROPSTEN_MNEMONIC && \
-  export ROPSTEN_MNEMONIC=$ROPSTEN_MNEMONIC && \
+$ read -s -p "MNEMONIC? " GOERLI_MNEMONIC && \
+  export GOERLI_MNEMONIC=$GOERLI_MNEMONIC && \
   echo ""
 
-# ROPSTEN main contract
-$ npm run deploy:ropsten -- \
+# GOERLI main contract
+$ npm run deploy:goerli -- \
   --contract ExchangeDeposit \
   --arguments '["COLDADDRESS","ADMINADDRESS"]'
-# ROPSTEN ProxyFactory
-$ npm run deploy:ropsten -- \
+# GOERLI ProxyFactory
+$ npm run deploy:goerli -- \
   --contract ProxyFactory \
   --arguments '["MAINCONTRACTADDRESS"]'
-# ROPSTEN deploy proxy
-$ npm run deploy-proxy:ropsten -- \
+# GOERLI deploy proxy
+$ npm run deploy-proxy:goerli -- \
   --factory "PROXYFACTORYADDRESS"
 
 # Verify on etherscan
-# Needs ETHERSCAN_APIKEY and ROPSTEN_ENDPOINT
-$ npx hardhat verify --network ropsten "CONTRACTADDRESS" "CONSTRUCTOR ARG 1" "ARG 2"
+# Needs ETHERSCAN_APIKEY and GOERLI_ENDPOINT
+$ npx hardhat verify --network goerli "CONTRACTADDRESS" "CONSTRUCTOR ARG 1" "ARG 2"
 # Please see documentation for the plugin for hardhat etherscan
 # https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html
 ```

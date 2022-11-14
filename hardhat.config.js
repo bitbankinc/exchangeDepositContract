@@ -17,16 +17,16 @@ module.exports = {
         accountsBalance: '1000000000000000000000000000',
       },
     },
-    ropsten: {
-      url: process.env.ROPSTEN_ENDPOINT || 'INVALIDENDPOINT',
-      accounts: process.env.ROPSTEN_MNEMONIC
+    goerli: {
+      url: process.env.GOERLI_ENDPOINT || 'INVALIDENDPOINT',
+      accounts: process.env.GOERLI_MNEMONIC
         ? {
-            mnemonic: process.env.ROPSTEN_MNEMONIC,
+            mnemonic: process.env.GOERLI_MNEMONIC,
           }
         : undefined,
-      gas: parseInt(process.env.ROPSTEN_GAS) || 'auto',
-      gasPrice: parseInt(process.env.ROPSTEN_GASPRICE) || 'auto',
-      gasMultiplier: parseFloat(process.env.ROPSTEN_GASMULTIPLIER) || 1,
+      gas: parseInt(process.env.GOERLI_GAS) || 'auto',
+      gasPrice: parseInt(process.env.GOERLI_GASPRICE) || 'auto',
+      gasMultiplier: parseFloat(process.env.GOERLI_GASMULTIPLIER) || 1,
     },
     mainnet: {
       url: process.env.MAINNET_ENDPOINT || 'INVALIDENDPOINT',
