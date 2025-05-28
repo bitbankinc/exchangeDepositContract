@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.11;
+pragma solidity ^0.8.20;
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
@@ -15,9 +15,10 @@ interface ERC20Interface {
      * @dev Returns a boolean value indicating whether the operation succeeded.
      * @dev Emits a {Transfer} event.
      */
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
+    function transfer(
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 }
 
 contract SimpleCoin is ERC20Interface {
@@ -30,20 +31,16 @@ contract SimpleCoin is ERC20Interface {
     }
 
     // Below are the two functions we need to provide for tests
-    function balanceOf(address account)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function balanceOf(
+        address account
+    ) external view override returns (uint256) {
         return balances[account];
     }
 
-    function transfer(address recipient, uint256 amount)
-        external
-        override
-        returns (bool)
-    {
+    function transfer(
+        address recipient,
+        uint256 amount
+    ) external override returns (bool) {
         if (
             balances[msg.sender] >= amount &&
             amount > 0 &&

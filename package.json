@@ -9,8 +9,8 @@
     "coverage:run": "hardhat coverage",
     "deploy:mainnet": "hardhat deploy --network mainnet",
     "deploy-proxy:mainnet": "hardhat deploy-proxy --network mainnet",
-    "deploy:ropsten": "hardhat deploy --network ropsten",
-    "deploy-proxy:ropsten": "hardhat deploy-proxy --network ropsten",
+    "deploy:sepolia": "hardhat deploy --network sepolia",
+    "deploy-proxy:sepolia": "hardhat deploy-proxy --network sepolia",
     "deploy:localhost": "hardhat deploy --network localhost",
     "deploy-proxy:localhost": "hardhat deploy-proxy --network localhost",
     "format": "npm run prettier -- --write",
@@ -36,25 +36,24 @@
     "artifacts/contracts/ExchangeDeposit.sol/ExchangeDeposit.json",
     "artifacts/contracts/ProxyFactory.sol/ProxyFactory.json"
   ],
-  "dependencies": {
-    "@openzeppelin/contracts": "3.2.0"
-  },
   "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.0.0",
-    "@nomiclabs/hardhat-etherscan": "^2.0.1",
-    "@nomiclabs/hardhat-truffle5": "^2.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-etherscan": "^3.1.0",
+    "@nomiclabs/hardhat-truffle5": "^2.0.7",
     "@nomiclabs/hardhat-web3": "^2.0.0",
-    "chai": "^4.2.0",
-    "ethers": "^5.0.19",
-    "hardhat": "^2.0.3",
-    "istanbul": "^0.4.5",
-    "mocha": "^8.2.1",
-    "prettier": "^1.19.1",
-    "prettier-plugin-solidity": "^1.0.0-beta.1",
-    "rlp": "^2.2.6",
-    "solc": "0.6.11",
-    "solhint": "^3.2.0",
-    "solidity-coverage": "^0.7.12",
-    "web3": "^1.3.0"
+    "@openzeppelin/contracts": "^4.9.6",
+    "@openzeppelin/test-helpers": "^0.5.16",
+    "chai": "^4.3.10",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.12.7",
+    "mocha": "^10.4.0",
+    "prettier": "^3.2.5",
+    "prettier-plugin-solidity": "^1.3.1",
+    "rlp": "^2.2.7",
+    "solc": "0.8.20",
+    "solhint": "^5.1.0",
+    "solidity-coverage": "^0.8.16",
+    "web3": "^1.10.4"
   }
 }

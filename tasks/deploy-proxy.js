@@ -7,7 +7,7 @@ const rl = readline.createInterface({
   output: process.stdout,
   terminal: false,
 });
-const prompt = query => new Promise(resolve => rl.question(query, resolve));
+const prompt = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 task('deploy-proxy', 'Deploys a proxy from ProxyFactory')
   .addParam('factory', 'The factory address')

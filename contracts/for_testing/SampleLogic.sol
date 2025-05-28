@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.11;
+pragma solidity ^0.8.20;
+
+import { IERC20, SafeERC20 } from './TestERC20.sol';
+import { ExchangeDepositDummy } from './ExchangeDepositDummy.sol';
 
 /**
  * @dev This is a sample to show how adding new logic would work
@@ -89,10 +92,9 @@ contract SampleLogic {
      * The code has been changed by one byte (DUP1 to DUP4, it DUPs the same item)
      * @return returnAddr The new contract address.
      */
-    function deploySpecialInstance(bytes32 salt)
-        public
-        returns (address payable returnAddr)
-    {
+    function deploySpecialInstance(
+        bytes32 salt
+    ) public returns (address payable returnAddr) {
         bytes memory code = INIT_CODE;
         assembly {
             let pos := add(code, 0x20)
@@ -103,37 +105,6 @@ contract SampleLogic {
             if eq(returnAddr, 0) {
                 revert(0, 0)
             }
-        }
-    }
-}
-
-/// @dev This is so we don't have to import ExchangeDeposit.
-// etherscan verification API was including this test source file.
-contract ExchangeDepositDummy {
-    address payable public coldAddress;
-}
-
-interface IERC20 {
-    function balanceOf(address account) external view returns (uint256);
-
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
-}
-
-library SafeERC20 {
-    function safeTransfer(
-        IERC20 token,
-        address recipient,
-        uint256 amount
-    ) internal {
-        bytes memory data =
-            abi.encodeWithSelector(token.transfer.selector, recipient, amount);
-        (bool success, bytes memory returndata) = address(token).call(data);
-        require(success, 'SafeERC20: low-level call failed');
-        if (returndata.length > 0) {
-            // Return data is optional
-            require(abi.decode(returndata, (bool)), 'ERC20 did not succeed');
         }
     }
 }

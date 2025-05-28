@@ -3,6 +3,7 @@ require('@nomiclabs/hardhat-etherscan');
 require('@nomiclabs/hardhat-truffle5');
 require('@nomiclabs/hardhat-web3');
 require('solidity-coverage');
+require('@nomicfoundation/hardhat-chai-matchers');
 require('./tasks/deploy-contract');
 require('./tasks/deploy-proxy');
 
@@ -17,16 +18,16 @@ module.exports = {
         accountsBalance: '1000000000000000000000000000',
       },
     },
-    ropsten: {
-      url: process.env.ROPSTEN_ENDPOINT || 'INVALIDENDPOINT',
-      accounts: process.env.ROPSTEN_MNEMONIC
+    sepolia: {
+      url: process.env.SEPOLIA_ENDPOINT || 'INVALIDENDPOINT',
+      accounts: process.env.SEPOLIA_MNEMONIC
         ? {
-            mnemonic: process.env.ROPSTEN_MNEMONIC,
+            mnemonic: process.env.SEPOLIA_MNEMONIC,
           }
         : undefined,
-      gas: parseInt(process.env.ROPSTEN_GAS) || 'auto',
-      gasPrice: parseInt(process.env.ROPSTEN_GASPRICE) || 'auto',
-      gasMultiplier: parseFloat(process.env.ROPSTEN_GASMULTIPLIER) || 1,
+      gas: parseInt(process.env.SEPOLIA_GAS) || 'auto',
+      gasPrice: parseInt(process.env.SEPOLIA_GASPRICE) || 'auto',
+      gasMultiplier: parseFloat(process.env.SEPOLIA_GASMULTIPLIER) || 1,
     },
     mainnet: {
       url: process.env.MAINNET_ENDPOINT || 'INVALIDENDPOINT',
@@ -41,13 +42,13 @@ module.exports = {
     },
   },
   solidity: {
-    version: '0.6.11',
+    version: '0.8.20',
     settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
-      evmVersion: 'istanbul',
+      evmVersion: 'shanghai',
       outputSelection: {
         '*': {
           '*': [

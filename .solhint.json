@@ -2,7 +2,7 @@
   "extends": "solhint:recommended",
   "rules": {
     "quotes": ["error","single"],
-    "compiler-version": ["error","0.6.11"],
+    "compiler-version": ["error","^0.8.20"],
     "no-inline-assembly": "off",
     "avoid-low-level-calls": "off",
     "no-complex-fallback": "off",

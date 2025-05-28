@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.11;
+pragma solidity ^0.8.20;
+
+// Custom Errors
+error InvalidMainAddress(address addr);
 
 contract ProxyFactory {
     /// @dev See comment below for explanation of the proxy INIT_CODE
@@ -10,16 +13,16 @@ contract ProxyFactory {
         hex'5b363d3d373d3d363d855af4'
         hex'5b3d82803e603c573d81fd5b3d81f3';
     /// @dev The main address that the deployed proxies will forward to.
-    address payable public immutable mainAddress;
+    address payable public immutable MAIN_ADDRESS;
 
-    constructor(address payable addr) public {
-        require(addr != address(0), '0x0 is an invalid address');
-        mainAddress = addr;
+    constructor(address payable addr) {
+        if (addr == address(0)) revert InvalidMainAddress(addr);
+        MAIN_ADDRESS = addr;
     }
 
     /**
      * @dev This deploys an extremely minimalist proxy contract with the
-     * mainAddress embedded within.
+     * MAIN_ADDRESS embedded within.
      * Note: The bytecode is explained in comments below this contract.
      * @return dst The new contract address.
      */
@@ -27,7 +30,7 @@ contract ProxyFactory {
         // copy init code into memory
         // and immutable ExchangeDeposit address onto stack
         bytes memory initCodeMem = INIT_CODE;
-        address payable addrStack = mainAddress;
+        address payable addrStack = MAIN_ADDRESS;
         assembly {
             // Get the position of the start of init code
             let pos := add(initCodeMem, 0x20)

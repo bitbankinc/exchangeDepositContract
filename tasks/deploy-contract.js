@@ -8,7 +8,7 @@ const rl = readline.createInterface({
   output: process.stdout,
   terminal: false,
 });
-const prompt = query => new Promise(resolve => rl.question(query, resolve));
+const prompt = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 task('deploy', 'Deploys a contract with given arguments')
   .addParam('contract', 'The name of the contract')

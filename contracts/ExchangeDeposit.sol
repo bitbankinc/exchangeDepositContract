@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.11;
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
-import '@openzeppelin/contracts/utils/Address.sol';
+pragma solidity ^0.8.20;
+import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import { SafeERC20 } from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import { Address } from '@openzeppelin/contracts/utils/Address.sol';
+
+// Custom Errors
+error InvalidAddress(address addr);
+error UnauthorizedCaller(address caller, address expected);
+error ContractIsDead();
+error CallingWrongContract();
+error EthGatherFailed();
+error ImplementationNotAContract(address addr);
+error AmountTooSmall(uint256 sent, uint256 minimum);
+error EthForwardFailed();
+error FallbackContractNotSet();
+error FallbackContractFailed();
 
 /**
  * @title ExchangeDeposit
@@ -40,24 +52,24 @@ contract ExchangeDeposit {
      * It has the ability to kill the contract and disable logic forwarding,
      * and change the coldAddress and implementation address storages.
      */
-    address payable public immutable adminAddress;
+    address payable public immutable ADMIN_ADDRESS;
     /**
      * @dev The address of this ExchangeDeposit instance. This is used
      * for discerning whether we are a Proxy or an ExchangeDepsosit.
      */
-    address payable private immutable thisAddress;
+    address payable private immutable THIS_ADDRESS;
 
     /**
      * @notice Create the contract, and sets the destination address.
      * @param coldAddr See storage coldAddress
-     * @param adminAddr See storage adminAddress
+     * @param adminAddr See storage ADMIN_ADDRESS
      */
-    constructor(address payable coldAddr, address payable adminAddr) public {
-        require(coldAddr != address(0), '0x0 is an invalid address');
-        require(adminAddr != address(0), '0x0 is an invalid address');
+    constructor(address payable coldAddr, address payable adminAddr) {
+        if (coldAddr == address(0)) revert InvalidAddress(coldAddr);
+        if (adminAddr == address(0)) revert InvalidAddress(adminAddr);
         coldAddress = coldAddr;
-        adminAddress = adminAddr;
-        thisAddress = address(this);
+        ADMIN_ADDRESS = adminAddr;
+        THIS_ADDRESS = payable(address(this));
     }
 
     /**
@@ -77,7 +89,7 @@ contract ExchangeDeposit {
      * @return bool of whether or not this is ExchangeDeposit
      */
     function isExchangeDepositor() internal view returns (bool) {
-        return thisAddress == address(this);
+        return THIS_ADDRESS == address(this);
     }
 
     /**
@@ -86,7 +98,7 @@ contract ExchangeDeposit {
      */
     function getExchangeDepositor() internal view returns (ExchangeDeposit) {
         // If this context is ExchangeDeposit, use `this`, else use exDepositorAddr
-        return isExchangeDepositor() ? this : ExchangeDeposit(thisAddress);
+        return isExchangeDepositor() ? this : ExchangeDeposit(THIS_ADDRESS);
     }
 
     /**
@@ -99,40 +111,40 @@ contract ExchangeDeposit {
         return
             isExchangeDepositor()
                 ? implementation
-                : ExchangeDeposit(thisAddress).implementation();
+                : ExchangeDeposit(THIS_ADDRESS).implementation();
     }
 
     /**
      * @dev Internal function for getting the sendTo address for gathering ERC20/ETH.
-     * If the contract is dead, they will be forwarded to the adminAddress.
+     * If the contract is dead, they will be forwarded to the ADMIN_ADDRESS.
      * @return address payable for sending ERC20/ETH
      */
     function getSendAddress() internal view returns (address payable) {
         ExchangeDeposit exDepositor = getExchangeDepositor();
         // Use exDepositor to perform logic for finding send address
         address payable coldAddr = exDepositor.coldAddress();
-        // If ExchangeDeposit is killed, use adminAddress, else use coldAddress
-        address payable toAddr =
-            coldAddr == address(0) ? exDepositor.adminAddress() : coldAddr;
+        // If ExchangeDeposit is killed, use ADMIN_ADDRESS, else use coldAddress
+        address payable toAddr = coldAddr == address(0)
+            ? exDepositor.ADMIN_ADDRESS()
+            : coldAddr;
         return toAddr;
     }
 
     /**
      * @dev Modifier that will execute internal code block only if the sender is the specified account
      */
-    modifier onlyAdmin {
-        require(msg.sender == adminAddress, 'Unauthorized caller');
+    modifier onlyAdmin() {
+        if (msg.sender != ADMIN_ADDRESS)
+            revert UnauthorizedCaller(msg.sender, ADMIN_ADDRESS);
         _;
     }
 
     /**
      * @dev Modifier that will execute internal code block only if not killed
      */
-    modifier onlyAlive {
-        require(
-            getExchangeDepositor().coldAddress() != address(0),
-            'I am dead :-('
-        );
+    modifier onlyAlive() {
+        if (getExchangeDepositor().coldAddress() == address(0))
+            revert ContractIsDead();
         _;
     }
 
@@ -140,15 +152,15 @@ contract ExchangeDeposit {
      * @dev Modifier that will execute internal code block only if called directly
      * (Not via proxy delegatecall)
      */
-    modifier onlyExchangeDepositor {
-        require(isExchangeDepositor(), 'Calling Wrong Contract');
+    modifier onlyExchangeDepositor() {
+        if (!isExchangeDepositor()) revert CallingWrongContract();
         _;
     }
 
     /**
      * @notice Execute a token transfer of the full balance from the proxy
      * to the designated recipient.
-     * @dev Recipient is coldAddress if not killed, else adminAddress.
+     * @dev Recipient is coldAddress if not killed, else ADMIN_ADDRESS.
      * @param instance The address of the erc20 token contract
      */
     function gatherErc20(IERC20 instance) external {
@@ -156,7 +168,8 @@ contract ExchangeDeposit {
         if (forwarderBalance == 0) {
             return;
         }
-        instance.safeTransfer(getSendAddress(), forwarderBalance);
+        address payable sendAddr = getSendAddress(); // Cache the address
+        instance.safeTransfer(sendAddr, forwarderBalance);
     }
 
     /**
@@ -170,20 +183,17 @@ contract ExchangeDeposit {
             return;
         }
         (bool result, ) = getSendAddress().call{ value: balance }('');
-        require(result, 'Could not gather ETH');
+        if (!result) revert EthGatherFailed();
     }
 
     /**
      * @notice Change coldAddress to newAddress.
      * @param newAddress the new address for coldAddress
      */
-    function changeColdAddress(address payable newAddress)
-        external
-        onlyExchangeDepositor
-        onlyAlive
-        onlyAdmin
-    {
-        require(newAddress != address(0), '0x0 is an invalid address');
+    function changeColdAddress(
+        address payable newAddress
+    ) external onlyExchangeDepositor onlyAlive onlyAdmin {
+        if (newAddress == address(0)) revert InvalidAddress(newAddress);
         coldAddress = newAddress;
     }
 
@@ -192,16 +202,11 @@ contract ExchangeDeposit {
      * @dev newAddress can be address(0) (to disable extra implementations)
      * @param newAddress the new address for implementation
      */
-    function changeImplAddress(address payable newAddress)
-        external
-        onlyExchangeDepositor
-        onlyAlive
-        onlyAdmin
-    {
-        require(
-            newAddress == address(0) || newAddress.isContract(),
-            'implementation must be contract'
-        );
+    function changeImplAddress(
+        address payable newAddress
+    ) external onlyExchangeDepositor onlyAlive onlyAdmin {
+        if (newAddress != address(0) && !newAddress.isContract())
+            revert ImplementationNotAContract(newAddress);
         implementation = newAddress;
     }
 
@@ -209,12 +214,9 @@ contract ExchangeDeposit {
      * @notice Change minimumInput to newMinInput.
      * @param newMinInput the new minimumInput
      */
-    function changeMinInput(uint256 newMinInput)
-        external
-        onlyExchangeDepositor
-        onlyAlive
-        onlyAdmin
-    {
+    function changeMinInput(
+        uint256 newMinInput
+    ) external onlyExchangeDepositor onlyAlive onlyAdmin {
         minimumInput = newMinInput;
     }
 
@@ -222,7 +224,7 @@ contract ExchangeDeposit {
      * @notice Sets coldAddress to 0, killing the forwarding and logging.
      */
     function kill() external onlyExchangeDepositor onlyAlive onlyAdmin {
-        coldAddress = address(0);
+        coldAddress = payable(address(0));
     }
 
     /**
@@ -234,14 +236,15 @@ contract ExchangeDeposit {
      * cold account.
      */
     receive() external payable {
-        // Using a simplified version of onlyAlive
-        // since we know that any call here has no calldata
-        // this saves a large amount of gas due to the fact we know
-        // that this can only be called from the ExchangeDeposit context
-        require(coldAddress != address(0), 'I am dead :-(');
-        require(msg.value >= minimumInput, 'Amount too small');
-        (bool success, ) = coldAddress.call{ value: msg.value }('');
-        require(success, 'Forwarding funds failed');
+        address payable localColdAddress = coldAddress; 
+        uint256 localMinimumInput = minimumInput; 
+
+        if (localColdAddress == address(0)) revert ContractIsDead();
+        if (msg.value < localMinimumInput)
+            revert AmountTooSmall(msg.value, localMinimumInput);
+        
+        (bool success, ) = localColdAddress.call{ value: msg.value }('');
+        if (!success) revert EthForwardFailed();
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -253,8 +256,8 @@ contract ExchangeDeposit {
      */
     fallback() external payable onlyAlive {
         address payable toAddr = getImplAddress();
-        require(toAddr != address(0), 'Fallback contract not set');
+        if (toAddr == address(0)) revert FallbackContractNotSet();
         (bool success, ) = toAddr.delegatecall(msg.data);
-        require(success, 'Fallback contract failed');
+        if (!success) revert FallbackContractFailed();
     }
 }

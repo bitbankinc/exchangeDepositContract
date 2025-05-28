@@ -14,6 +14,7 @@ cold address. The gas cost for this should be somewhere in the 50k gas range.
 address... since we can't stop ERC20 deposits, we want to leave a path for
 fund recovery if the user deposits to an old deposit address after it's been
 killed.
+- **Solidity Version:** ^0.8.20
 
 ## Structure
 
@@ -32,11 +33,26 @@ assets given to the `Proxy` after the fact by changing `address implementation`.
 gatherErc20 and gatherEth will forward to the `address adminAddress`.
 (Since we can't refuse ERC20 payments, and a `selfdestruct` somewhere could give funds to
 a deposit address, and we should be able to recover it somehow.
+### Solidity 0.8 Upgrade Notes
+
+This project was originally written for Solidity 0.6.11. It has been upgraded to ^0.8.20. Key changes included:
+
+- Updated Solidity `pragma` statements in all contracts.
+- Updated `hardhat.config.js` compiler version.
+- Updated `@openzeppelin/contracts` dependency to `4.9.3`.
+- Updated `prettier` dependency to `^2.8.8`.
+- Fixed `address` to `address payable` explicit conversion errors introduced in Solidity 0.8+.
+- Updated test file (`test/exchangedeposit.js`) assertions (`assert.rejects`) to match new revert reason string formats.
+- Adjusted gas cost expectations in tests.
+- **Note:** Due to older dependencies in the project structure, `npm install --legacy-peer-deps` is currently required to resolve peer dependency conflicts.
+
+
 
 ### Run tests
 
 ```bash
-$ npm ci # Install from package-lock.json using npm ci
+# Install dependencies (may need --legacy-peer-deps due to older package structure)
+$ npm install --legacy-peer-deps
 $ npm test
 ```
 
@@ -53,39 +69,39 @@ $ npm run build
 
 `exchangeDepositor` is the main logic contract and `proxy` is the
 customer deposit contract. It will take a few minutes to deploy.
-Add `ROPSTEN_GASPRICE=100000000000` to the command to set the gasPrice
+Add `SEPOLIA_GASPRICE=100000000000` to the command to set the gasPrice
 to 100 gWei etc. (See hardhat.config.js for which ENV vars are set to which settings)
 
 For Mainnet:
-- Change all env vars from ROPSTEN_* to MAINNET_*
-- Use npm run *:mainnet instead of npm run *:ropsten
+- Change all env vars from SEPOLIA_* to MAINNET_*
+- Use npm run *:mainnet instead of npm run *:sepolia
 
 ```bash
 # Use this command to get ENV vars without sending them to stdout
-$ read -s -p "ENDPOINT? " ROPSTEN_ENDPOINT && \
-  export ROPSTEN_ENDPOINT=$ROPSTEN_ENDPOINT && \
+$ read -s -p "ENDPOINT? " SEPOLIA_ENDPOINT && \
+  export SEPOLIA_ENDPOINT=$SEPOLIA_ENDPOINT && \
   echo ""
-$ read -s -p "MNEMONIC? " ROPSTEN_MNEMONIC && \
-  export ROPSTEN_MNEMONIC=$ROPSTEN_MNEMONIC && \
+$ read -s -p "MNEMONIC? " SEPOLIA_MNEMONIC && \
+  export SEPOLIA_MNEMONIC=$SEPOLIA_MNEMONIC && \
   echo ""
 
-# ROPSTEN main contract
-$ npm run deploy:ropsten -- \
+# Sepolia main contract
+$ npm run deploy:sepolia -- \
   --contract ExchangeDeposit \
   --arguments '["COLDADDRESS","ADMINADDRESS"]'
-# ROPSTEN ProxyFactory
-$ npm run deploy:ropsten -- \
+# Sepolia ProxyFactory
+$ npm run deploy:sepolia -- \
   --contract ProxyFactory \
   --arguments '["MAINCONTRACTADDRESS"]'
-# ROPSTEN deploy proxy
-$ npm run deploy-proxy:ropsten -- \
+# Sepolia deploy proxy
+$ npm run deploy-proxy:sepolia -- \
   --factory "PROXYFACTORYADDRESS"
 
 # Verify on etherscan
-# Needs ETHERSCAN_APIKEY and ROPSTEN_ENDPOINT
-$ npx hardhat verify --network ropsten "CONTRACTADDRESS" "CONSTRUCTOR ARG 1" "ARG 2"
-# Please see documentation for the plugin for hardhat etherscan
-# https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html
+# Needs ETHERSCAN_APIKEY and SEPOLIA_ENDPOINT
+$ npx hardhat verify --network sepolia CONTRACTADDRESS "CONSTRUCTOR ARG 1" "ARG 2"
+# Note: Uses @nomicfoundation/hardhat-verify plugin (successor to @nomiclabs/hardhat-etherscan)
+# See: https://hardhat.org/hardhat-runner/plugins/nomicfoundation-hardhat-verify
 ```
 
 ### usage
